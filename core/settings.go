@@ -50,7 +50,7 @@ func LoadSettings() *Settings {
 		},
 		Server: ServerSettings{
 			Host: environment.GetOr("SERVER_HOST", "0.0.0.0"),
-			Port: environment.GetOr("SERVER_PORT", "8080"),
+			Port: environment.GetOr("SERVER_PORT", "8000"),
 		},
 		Database: DatabaseSettings{
 			Driver: environment.GetOr("DB_DRIVER", "postgres"),

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -138,24 +139,114 @@ func removeApp(name string) error {
 
 func addInstalledImport(name string) error {
 	line := fmt.Sprintf("\t_ \"kyrux/apps/%s\"", name)
+	content, err := os.ReadFile(installedFile)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(content), "import (") {
+		block := "\nimport (\n" + line + "\n)\n"
+		return os.WriteFile(installedFile, append(bytes.TrimRight(content, "\n"), []byte(block)...), 0644)
+	}
 	return addLineBeforeClosing(installedFile, ")", line)
 }
 
 func removeInstalledImport(name string) error {
 	line := fmt.Sprintf("\t_ \"kyrux/apps/%s\"", name)
-	return removeLine(installedFile, line)
+	if err := removeLine(installedFile, line); err != nil {
+		return err
+	}
+	return collapseImportIfEmpty(installedFile)
+}
+
+// collapseImportIfEmpty remove o bloco import() quando ele ficar vazio.
+func collapseImportIfEmpty(path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(content), "\n")
+	for i, l := range lines {
+		if strings.TrimSpace(l) != "import (" {
+			continue
+		}
+		for j := i + 1; j < len(lines); j++ {
+			t := strings.TrimSpace(lines[j])
+			if t == "" {
+				continue
+			}
+			if t == ")" {
+				start := i
+				if start > 0 && strings.TrimSpace(lines[start-1]) == "" {
+					start--
+				}
+				result := append(lines[:start:start], lines[j+1:]...)
+				return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+			}
+			break
+		}
+	}
+	return nil
 }
 
 // ── settings.go ──────────────────────────────────────────────────────────────
 
 func addInstalledApp(name string) error {
+	content, err := os.ReadFile(settingsFile)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(content), "\n")
 	entry := fmt.Sprintf("\t\t\t\"%s\",", name)
-	return addLineAfterAnchor(settingsFile, "InstalledApps:", "},", entry)
+
+	for i, l := range lines {
+		if !strings.Contains(l, "InstalledApps:") {
+			continue
+		}
+		// Formato compacto: InstalledApps: []string{},
+		if strings.Contains(l, "[]string{}") {
+			indent := l[:strings.Index(l, "InstalledApps")]
+			expanded := []string{indent + "InstalledApps: []string{", entry, indent + "},"}
+			result := append(lines[:i:i], append(expanded, lines[i+1:]...)...)
+			return os.WriteFile(settingsFile, []byte(strings.Join(result, "\n")), 0644)
+		}
+		// Formato expandido: encontra o }, de fechamento
+		for j := i + 1; j < len(lines); j++ {
+			if strings.TrimSpace(lines[j]) == "}," {
+				lines = append(lines[:j:j], append([]string{entry}, lines[j:]...)...)
+				return os.WriteFile(settingsFile, []byte(strings.Join(lines, "\n")), 0644)
+			}
+		}
+	}
+	return fmt.Errorf("InstalledApps não encontrado em %s", settingsFile)
 }
 
 func removeInstalledApp(name string) error {
 	entry := fmt.Sprintf("\t\t\t\"%s\",", name)
-	return removeLine(settingsFile, entry)
+	if err := removeLine(settingsFile, entry); err != nil {
+		return err
+	}
+	return collapseInstalledAppsIfEmpty(settingsFile)
+}
+
+// collapseInstalledAppsIfEmpty converte InstalledApps: []string{\n},  de volta para []string{},
+func collapseInstalledAppsIfEmpty(path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(content), "\n")
+
+	for i, l := range lines {
+		if !strings.Contains(l, "InstalledApps:") || !strings.Contains(l, "[]string{") {
+			continue
+		}
+		if i+1 < len(lines) && strings.TrimSpace(lines[i+1]) == "}," {
+			indent := l[:strings.Index(l, "InstalledApps")]
+			result := append(lines[:i:i], append([]string{indent + "InstalledApps: []string{},"}, lines[i+2:]...)...)
+			return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+		}
+	}
+	return nil
 }
 
 // ── helpers de arquivo ────────────────────────────────────────────────────────
@@ -278,7 +369,7 @@ func {{title .Name}}View(ctx *router.Context) {
 	context := map[string]any{
 		"example": "example",
 	}
-	render.For("{{.Name}}").Render(ctx, "url_name", context)
+	render.For("{{.Name}}").Render(ctx, "index.html", context)
 }
 `
 

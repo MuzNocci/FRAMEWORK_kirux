@@ -112,7 +112,7 @@ func (e *Engine) reload() error {
 		if err != nil {
 			return err
 		}
-		name := strings.TrimSuffix(filepath.Base(path), ".html")
+		name := filepath.Base(path)
 		templates[name] = tmpl
 		return nil
 	})

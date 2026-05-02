@@ -43,6 +43,24 @@ Sistema interno de eventos desacoplados
 WebSocket invisível + bridge com EventBus
 
 
+## COMANDOS:
+
+### Iniciar o servidor:
+```bash
+go run main.go
+```
+
+### Criar um novo app:
+```bash
+go run main.go startapp <nome>
+```
+
+### Remover um app existente:
+```bash
+go run main.go removeapp <nome>
+```
+
+
 ## FLUXO DO SISTEMA:
 Request -> Middleware -> Router -> View -> Service -> DB
 -> EventBus -> Realtime -> Client update automático
