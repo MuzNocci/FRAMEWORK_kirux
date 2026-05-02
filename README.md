@@ -1,4 +1,6 @@
-### KYRUX FRAMEWORK - DOCUMENTAÇÃO
+### KYRUX FRAMEWORK
+Criado e desenvolvido por Müller Nocciolli.
+Contato: muller.nocciolli@gmail.com
 
 
 

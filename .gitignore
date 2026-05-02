@@ -1,0 +1,37 @@
+# Environment
+.env
+
+# Development
+.claude
+
+# Build
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test
+*.test
+*.out
+coverage.html
+coverage.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+medias/
