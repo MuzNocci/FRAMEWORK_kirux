@@ -1,4 +1,4 @@
-### KYRUX FRAMEWORK
+# KYRUX FRAMEWORK
 Criado e desenvolvido por Müller Nocciolli.
 Contato: muller.nocciolli@gmail.com
 
@@ -18,28 +18,28 @@ Framework web em Go baseado em SSR, EventBus e Realtime invisível.
 
 ## CORE MODULES:
 
-# Bootstrap:
+### Bootstrap:
 Inicializa todo o framework (env, db, cache, router, realtime)
 
-# Environment:
+### Environment:
 Leitura de .env e variáveis do sistema
 
-# Settings:
+### Settings:
 Configuração tipada global
 
-# Router:
+### Router:
 Mapeamento de URLs para views
 
-# Render:
+### Render:
 Renderização SSR com injeção automática de realtime
 
-# Security:
+### Security:
 Autenticação, sessão, criptografia e middleware
 
-# EventBus:
+### EventBus:
 Sistema interno de eventos desacoplados
 
-# Realtime:
+### Realtime:
 WebSocket invisível + bridge com EventBus
 
 
