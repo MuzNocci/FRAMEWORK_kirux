@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"kyrux/core"
 	"kyrux/core/bootstrap/welcome"
 	"kyrux/core/cache"
 	"kyrux/core/database"
@@ -18,6 +17,7 @@ import (
 	"kyrux/core/security/csrf"
 	secmiddleware "kyrux/core/security/middleware"
 	"kyrux/core/security/session"
+	"kyrux/core/settings"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -31,7 +31,7 @@ import (
 )
 
 type Framework struct {
-	Settings *core.Settings
+	Settings *settings.Settings
 	Router   *router.Router
 	Events   *events.Bus
 	Realtime *realtime.Hub
@@ -46,12 +46,12 @@ func Init(envPath string) (*Framework, error) {
 		return nil, fmt.Errorf("bootstrap: env: %w", err)
 	}
 
-	settings := core.LoadSettings()
+	cfg := settings.Load()
 
-	render.SetDebug(settings.App.Debug)
-	kyerrors.SetDebug(settings.App.Debug)
-	addr := settings.Server.Host + ":" + settings.Server.Port
-	render.RegisterAppFuncs(settings.App.Name, settings.App.Version, settings.App.Env, addr)
+	render.SetDebug(cfg.App.Debug)
+	kyerrors.SetDebug(cfg.App.Debug)
+	addr := cfg.Server.Host + ":" + cfg.Server.Port
+	render.RegisterAppFuncs(cfg.App.Name, cfg.App.Version, cfg.App.Env, addr)
 	csrf.RegisterFuncs()
 
 	bus := events.NewBus()
@@ -59,14 +59,14 @@ func Init(envPath string) (*Framework, error) {
 	r := router.New()
 	kyerrors.SetRouteListFunc(r.Routes)
 	r.Use(secmiddleware.Recovery())
-	r.Use(secmiddleware.AllowedHosts(settings.Security.AllowedHost, settings.App.Debug))
+	r.Use(secmiddleware.AllowedHosts(cfg.Security.AllowedHost, cfg.App.Debug))
 	r.Use(csrf.Middleware)
-	a := auth.New(settings.Security.SecretKey)
-	store := session.NewStore(time.Duration(settings.Security.SessionTTL) * time.Second)
+	a := auth.New(cfg.Security.SecretKey)
+	store := session.NewStore(time.Duration(cfg.Security.SessionTTL) * time.Second)
 
 	dbm := database.NewManager()
-	if settings.Database.Enabled {
-		if err := dbm.Add("default", settings.Database.Driver, settings.Database.DSN); err != nil {
+	if cfg.Database.Enabled {
+		if err := dbm.Add("default", cfg.Database.Driver, cfg.Database.DSN); err != nil {
 			return nil, fmt.Errorf("bootstrap: db: %w", err)
 		}
 		log.Println("bootstrap: database connected")
@@ -75,7 +75,7 @@ func Init(envPath string) (*Framework, error) {
 	}
 
 	f := &Framework{
-		Settings: settings,
+		Settings: cfg,
 		Router:   r,
 		Events:   bus,
 		Realtime: hub,
@@ -84,14 +84,14 @@ func Init(envPath string) (*Framework, error) {
 		Sessions: store,
 	}
 
-	if settings.Cache.Enabled {
+	if cfg.Cache.Enabled {
 		f.Cache = cache.New()
 		log.Println("bootstrap: cache enabled")
 	} else {
 		log.Println("bootstrap: cache disabled (CACHE_ENABLED=false)")
 	}
 
-	for _, appName := range settings.InstalledApps {
+	for _, appName := range cfg.InstalledApps {
 		if fn, ok := registry[appName]; ok {
 			fn(r)
 			log.Printf("bootstrap: app '%s' registrado\n", appName)
@@ -109,7 +109,7 @@ func Init(envPath string) (*Framework, error) {
 	static := render.MultiStaticHandler("apps")
 	r.HandlePrefix("GET /static/", http.StripPrefix("/static/", static))
 
-	if settings.App.Debug {
+	if cfg.App.Debug {
 		lr := hotreload.NewHub()
 		lr.Watch("apps", "statics")
 		r.HandlePrefix("GET /__kyrux_reload__", lr)

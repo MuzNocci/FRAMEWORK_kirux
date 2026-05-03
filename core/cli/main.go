@@ -10,7 +10,7 @@ import (
 )
 
 const installedFile = "core/apps/installed.go"
-const settingsFile = "core/settings.go"
+const settingsFile = "core/settings/settings.go"
 
 func Run(args []string) {
 	if len(args) < 1 {

@@ -1,4 +1,4 @@
-package core
+package settings
 
 import (
 	"kyrux/core/environment"
@@ -68,7 +68,7 @@ func parseHosts(s string) []string {
 	return hosts
 }
 
-func LoadSettings() *Settings {
+func Load() *Settings {
 	return &Settings{
 		InstalledApps: []string{},
 		App: AppSettings{
