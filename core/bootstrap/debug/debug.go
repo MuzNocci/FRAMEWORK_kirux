@@ -1,8 +1,8 @@
 package debug
 
 import (
-	_ "embed"
 	"bytes"
+	_ "embed"
 	"fmt"
 	"html/template"
 	kyerrors "kyrux/core/errors"
@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-//go:embed debug.html
 var dashHTML string
 
 var (
