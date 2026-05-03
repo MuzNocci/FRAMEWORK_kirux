@@ -274,6 +274,25 @@ Arquivo .html/.css/.js  → hotreload detecta → SSE → Browser recarrega
 Disponível automaticamente em `http://localhost:6060/debug/pprof/`
 
 
+## PERFORMANCE:
+
+Benchmark com `bombardier`, 125 conexões simultâneas, 30 segundos,
+servindo uma página SSR completa com cadeia de middlewares (Recovery, AllowedHosts, CSRF):
+
+```
+Req/s  (média)   78.500
+Req/s  (pico)   133.619
+Latência p50      1,06ms
+Latência p95      4,81ms
+Latência p99      8,76ms
+Erros                  0
+Throughput       431 MB/s
+```
+
+> Medido em localhost (cliente e servidor na mesma máquina).
+> Resultados variam conforme hardware e carga de trabalho da view.
+
+
 ## CONCEITO CHAVE:
 Kyrux representa execução no "momento certo" (Kairos),
 onde eventos dirigem a atualização do sistema em tempo real.
