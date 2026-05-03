@@ -643,13 +643,7 @@ func LoginView(ctx *router.Context) {
     sess.Values["usuario_id"] = usuario.ID
     sess.Values["nome"] = usuario.Nome
 
-    http.SetCookie(ctx.Writer, &http.Cookie{
-        Name:     session.CookieName(),
-        Value:    sess.ID,
-        HttpOnly: true,
-        SameSite: http.SameSiteStrictMode,
-        Path:     "/",
-    })
+    session.SetCookie(ctx.Writer, sess.ID, true) // true = Secure (HTTPS em produção)
 
     ctx.Redirect("/dashboard/", http.StatusFound)
 }
@@ -884,27 +878,21 @@ errors.Set(500, func(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-## 17. Profiling
+## 17. Debug Dashboard
 
 Disponível automaticamente em `APP_ENV=development`:
 
 ```
-http://localhost:6060/debug/pprof/
+http://localhost:8000/kyrux/debug/
 ```
 
-Endpoints úteis:
+Exibe:
 
-| URL                                    | Dados                       |
-|----------------------------------------|-----------------------------|
-| `/debug/pprof/`                        | Índice geral                |
-| `/debug/pprof/goroutine?debug=1`       | Goroutines ativas           |
-| `/debug/pprof/heap`                    | Alocações de memória        |
-| `/debug/pprof/profile?seconds=30`      | CPU profile (30s)           |
-
-```bash
-# Analisar com go tool pprof:
-go tool pprof http://localhost:6060/debug/pprof/heap
-```
+| Seção       | Informações                                              |
+|-------------|----------------------------------------------------------|
+| Aplicação   | Nome, versão, ambiente, endereço, uptime                 |
+| Runtime     | Go version, OS/arch, workers, goroutines, heap, GC cycles |
+| Rotas       | Todas as rotas registradas com método e path             |
 
 ---
 

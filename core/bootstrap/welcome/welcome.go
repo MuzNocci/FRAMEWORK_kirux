@@ -3,7 +3,7 @@ package welcome
 import (
 	_ "embed"
 	"bytes"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"html/template"
 	"kyrux/core/environment"
@@ -43,7 +43,7 @@ func RegisterIfNeeded(r *router.Router) {
 		panic("welcome: " + err.Error())
 	}
 	body := buf.Bytes()
-	etag := fmt.Sprintf(`"%x"`, md5.Sum(body))
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(body))
 	contentLen := strconv.Itoa(len(body))
 
 	r.Handle("GET /", func(ctx *router.Context) {

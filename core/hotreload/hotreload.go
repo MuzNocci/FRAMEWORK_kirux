@@ -64,7 +64,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-ch:
-			fmt.Fprintf(w, "data: reload\n\n")
+			if _, err := fmt.Fprintf(w, "data: reload\n\n"); err != nil {
+				return
+			}
 			flusher.Flush()
 		}
 	}

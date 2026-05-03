@@ -72,7 +72,7 @@ func startApp(name string) error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return fmt.Errorf("criar diretório %s: %w", dir, err)
 		}
 	}
@@ -152,7 +152,7 @@ func addInstalledImport(name string) error {
 	}
 	if !strings.Contains(string(content), "import (") {
 		block := "\nimport (\n" + line + "\n)\n"
-		return os.WriteFile(installedFile, append(bytes.TrimRight(content, "\n"), []byte(block)...), 0644)
+		return os.WriteFile(installedFile, append(bytes.TrimRight(content, "\n"), []byte(block)...), 0600)
 	}
 	return addLineBeforeClosing(installedFile, ")", line)
 }
@@ -187,7 +187,7 @@ func collapseImportIfEmpty(path string) error {
 					start--
 				}
 				result := append(lines[:start:start], lines[j+1:]...)
-				return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+				return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0600)
 			}
 			break
 		}
@@ -220,7 +220,7 @@ func addInstalledApp(name string) error {
 		for j := i + 1; j < len(lines); j++ {
 			if strings.TrimSpace(lines[j]) == "}," {
 				lines = append(lines[:j:j], append([]string{entry}, lines[j:]...)...)
-				return os.WriteFile(settingsFile, []byte(strings.Join(lines, "\n")), 0644)
+				return os.WriteFile(settingsFile, []byte(strings.Join(lines, "\n")), 0600)
 			}
 		}
 	}
@@ -250,7 +250,7 @@ func collapseInstalledAppsIfEmpty(path string) error {
 		if i+1 < len(lines) && strings.TrimSpace(lines[i+1]) == "}," {
 			indent := l[:strings.Index(l, "InstalledApps")]
 			result := append(lines[:i:i], append([]string{indent + "InstalledApps: []string{},"}, lines[i+2:]...)...)
-			return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+			return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0600)
 		}
 	}
 	return nil
@@ -274,35 +274,6 @@ func addLineBeforeClosing(path, closing, newLine string) error {
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
 }
 
-// addLineAfterAnchor encontra a linha que contém anchor, depois insere
-// newLine antes da primeira ocorrência de closing após essa linha.
-func addLineAfterAnchor(path, anchor, closing, newLine string) error {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	lines := strings.Split(string(content), "\n")
-
-	anchorIdx := -1
-	for i, l := range lines {
-		if strings.Contains(l, anchor) {
-			anchorIdx = i
-			break
-		}
-	}
-	if anchorIdx == -1 {
-		return fmt.Errorf("âncora '%s' não encontrada em %s", anchor, path)
-	}
-
-	for i := anchorIdx + 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == strings.TrimSpace(closing) {
-			lines = append(lines[:i], append([]string{newLine}, lines[i:]...)...)
-			break
-		}
-	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
-}
-
 func removeLine(path, target string) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -315,7 +286,7 @@ func removeLine(path, target string) error {
 			result = append(result, l)
 		}
 	}
-	return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+	return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0600)
 }
 
 // ── helpers de template ───────────────────────────────────────────────────────

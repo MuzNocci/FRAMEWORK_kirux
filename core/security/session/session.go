@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/hex"
 	"kyrux/core/security/crypton"
 	"net/http"
 	"sync"
@@ -33,7 +34,7 @@ func (s *Store) New() (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	id := string(b)
+	id := hex.EncodeToString(b)
 	sess := &Session{
 		ID:      id,
 		Values:  make(map[string]any),
@@ -62,7 +63,9 @@ func (s *Store) Delete(id string) {
 }
 
 func (s *Store) gc() {
-	for range time.Tick(s.ttl) {
+	ticker := time.NewTicker(s.ttl)
+	defer ticker.Stop()
+	for range ticker.C {
 		s.mu.Lock()
 		for id, sess := range s.sessions {
 			if time.Now().After(sess.Expires) {
@@ -74,6 +77,19 @@ func (s *Store) gc() {
 }
 
 func CookieName() string { return "kyrux_session" }
+
+// SetCookie define o cookie de sessão com as flags de segurança corretas.
+// secure deve ser true em produção (HTTPS). Usar em conjunto com session.New().
+func SetCookie(w http.ResponseWriter, sessionID string, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     CookieName(),
+		Value:    sessionID,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+	})
+}
 
 func FromRequest(r *http.Request, store *Store) (*Session, bool) {
 	cookie, err := r.Cookie(CookieName())

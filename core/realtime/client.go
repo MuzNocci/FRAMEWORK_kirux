@@ -1,12 +1,19 @@
 package realtime
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"net/http"
 
 	"golang.org/x/net/websocket"
 )
+
+func clientID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 type Client struct {
 	id   string
@@ -21,7 +28,7 @@ func newClient(w http.ResponseWriter, r *http.Request, hub *Hub) (*Client, error
 
 	handler := websocket.Handler(func(conn *websocket.Conn) {
 		c = &Client{
-			id:   fmt.Sprintf("%d", rand.Int63()),
+			id:   clientID(),
 			conn: conn,
 			hub:  hub,
 			send: make(chan []byte, 256),

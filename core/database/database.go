@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // DB encapsula *sql.DB com o nome do driver.
@@ -72,6 +73,10 @@ func open(driver, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("database: open [%s]: %w", driver, err)
 	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("database: ping [%s]: %w", driver, err)
 	}

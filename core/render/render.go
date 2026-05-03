@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	kyerrors "kyrux/core/errors"
 	"kyrux/core/router"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -119,7 +121,8 @@ func (r *Renderer) Render(ctx *router.Context, template string, data map[string]
 	err := r.engine.Render(ctx.Writer, template, merged)
 	mergedPool.Put(merged)
 	if err != nil {
-		http.Error(ctx.Writer, err.Error(), http.StatusInternalServerError)
+		log.Printf("render: %v", err)
+		kyerrors.RenderPanic(ctx.Writer, ctx.Request, err, nil)
 	}
 }
 
@@ -147,8 +150,11 @@ var (
 func (e *Engine) Render(w http.ResponseWriter, name string, data any) error {
 	if isDebug() {
 		e.mu.Lock()
-		_ = e.reload()
+		reloadErr := e.reload()
 		e.mu.Unlock()
+		if reloadErr != nil {
+			return reloadErr
+		}
 	}
 
 	var ce *compiledEntry

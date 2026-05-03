@@ -49,7 +49,7 @@ func RequireAuth(a *auth.Authenticator) router.MiddlewareFunc {
 			}
 			claims, err := a.ValidateToken(token)
 			if err != nil {
-				ctx.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
+				ctx.JSON(http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}
 			ctx.Set("claims", claims)
@@ -75,6 +75,21 @@ func CORS(allowedOrigins []string) router.MiddlewareFunc {
 			}
 			next(ctx)
 		}
+	}
+}
+
+// SecureHeaders adiciona cabeçalhos de segurança em produção:
+// HSTS, X-Content-Type-Options, X-Frame-Options e Referrer-Policy.
+// Deve ser registrado com r.Use() no bootstrap quando !debug.
+func SecureHeaders(next router.HandlerFunc) router.HandlerFunc {
+	return func(ctx *router.Context) {
+		h := ctx.Writer.Header()
+		h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:")
+		next(ctx)
 	}
 }
 

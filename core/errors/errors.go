@@ -180,6 +180,9 @@ func writeDebug(w http.ResponseWriter, code int, d debugData) {
 }
 
 func formatStack(stack []byte) template.HTML {
+	if len(stack) == 0 {
+		return ""
+	}
 	lines := strings.Split(string(stack), "\n")
 	var sb strings.Builder
 	for _, line := range lines {

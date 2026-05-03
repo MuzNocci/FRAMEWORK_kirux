@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{.AppName}} | Debug</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --go-blue:#00ACD7;--blue-dim:rgba(0,172,215,.08);--blue-border:rgba(0,172,215,.2);
+  --bg:#0D1117;--surface:#161B22;--surface2:#1C2333;--border:#21262D;
+  --text:#E6EDF3;--muted:#8B949E;
+  --green:#3FB950;--amber:#E5A220;--red:#F85149;--purple:#D2A8FF;--teal:#79C0FF;
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100%}
+a{color:inherit;text-decoration:none}
+
+/* header */
+header{border-bottom:1px solid var(--border);padding:.9rem 2.5rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0}
+.logo-mark{width:28px;height:28px;background:var(--go-blue);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;letter-spacing:-.5px}
+header span{font-size:1rem;font-weight:600;color:var(--text)}
+header .version{margin-left:auto;font-size:.7rem;color:var(--muted);background:var(--border);padding:.2rem .55rem;border-radius:999px}
+
+/* main */
+main{flex:1;padding:1.75rem 2rem;max-width:1060px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:1.25rem}
+
+/* badge */
+.badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;font-weight:600;letter-spacing:.05em;padding:.22rem .65rem;border-radius:999px;background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.25);color:var(--green)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+
+/* panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.panel-head{padding:.5rem .9rem;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between}
+.panel-head .label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.panel-head .count{font-size:.65rem;color:var(--go-blue);background:var(--blue-dim);border:1px solid var(--blue-border);padding:.1rem .4rem;border-radius:999px}
+
+/* info rows */
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:.45rem .9rem;border-bottom:1px solid var(--border);font-size:.78rem}
+.info-row:last-child{border-bottom:none}
+.info-key{color:var(--muted)}
+.info-val{font-family:"SF Mono","Fira Code","Consolas",monospace;color:var(--text)}
+
+/* routes */
+.routes{max-height:360px;overflow-y:auto}
+.route-row{display:grid;grid-template-columns:58px 1fr;align-items:center;gap:.6rem;padding:.38rem .9rem;border-bottom:1px solid var(--border);font-family:"SF Mono","Fira Code","Consolas",monospace;font-size:.73rem}
+.route-row:last-child{border-bottom:none}
+.method{font-weight:700;font-size:.68rem}
+.m-get{color:var(--green)}
+.m-post{color:var(--amber)}
+.m-put{color:var(--teal)}
+.m-delete{color:var(--red)}
+.m-patch{color:var(--purple)}
+.m-other{color:var(--muted)}
+.route-path{color:var(--text)}
+
+/* empty */
+.empty{padding:1.25rem .9rem;font-size:.78rem;color:var(--muted);text-align:center}
+
+/* footer */
+footer{border-top:1px solid var(--border);padding:.75rem 2rem;text-align:center;font-size:.82rem;color:var(--muted);flex-shrink:0;margin-top:auto}
+footer a{color:var(--go-blue);text-decoration:none}
+footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-mark">K</div>
+  <span>{{.AppName}}</span>
+  <span class="version">v{{.Version}}</span>
+</header>
+<main>
+  <div class="badge"><span class="dot"></span> development mode</div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head"><span class="label">Aplicação</span></div>
+      <div class="info-row"><span class="info-key">Nome</span><span class="info-val">{{.AppName}}</span></div>
+      <div class="info-row"><span class="info-key">Versão</span><span class="info-val">{{.Version}}</span></div>
+      <div class="info-row"><span class="info-key">Ambiente</span><span class="info-val">{{.Env}}</span></div>
+      <div class="info-row"><span class="info-key">Endereço</span><span class="info-val">{{.Addr}}</span></div>
+      <div class="info-row"><span class="info-key">Workers (GOMAXPROCS)</span><span class="info-val">{{.Workers}}</span></div>
+      <div class="info-row"><span class="info-key">Uptime</span><span class="info-val">{{.Uptime}}</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="label">Runtime</span></div>
+      <div class="info-row"><span class="info-key">Go</span><span class="info-val">{{.GoVersion}}</span></div>
+      <div class="info-row"><span class="info-key">OS / Arch</span><span class="info-val">{{.GOOS}}/{{.GOARCH}}</span></div>
+      <div class="info-row"><span class="info-key">Goroutines</span><span class="info-val">{{.Goroutines}}</span></div>
+      <div class="info-row"><span class="info-key">Heap alocado</span><span class="info-val">{{.HeapAlloc}}</span></div>
+      <div class="info-row"><span class="info-key">Heap total</span><span class="info-val">{{.HeapSys}}</span></div>
+      <div class="info-row"><span class="info-key">GC cycles</span><span class="info-val">{{.NumGC}}</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="label">Rotas registradas</span>
+      <span class="count">{{len .Routes}}</span>
+    </div>
+    {{if .Routes}}
+    <div class="routes">
+      {{range .Routes}}
+      <div class="route-row">
+        <span class="method {{methodClass .Method}}">{{.Method}}</span>
+        <span class="route-path">{{.Path}}</span>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty">nenhuma rota registrada</div>
+    {{end}}
+  </div>
+</main>
+<footer>
+  Kyrux Framework &mdash; construído com <a href="https://go.dev" target="_blank">Go</a>
+  &nbsp;&middot;&nbsp;
+  <a href="https://www.kyrux.com.br/docs/" target="_blank">Documentação</a>
+  &nbsp;&middot;&nbsp;
+  desenvolvido por <a href="https://www.nocciolli.com.br" target="_blank">M&uuml;ller Nocciolli</a>
+</footer>
+</body>
+</html>

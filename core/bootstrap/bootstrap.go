@@ -19,13 +19,14 @@ import (
 	"kyrux/core/security/session"
 	"kyrux/core/settings"
 	"log"
+	kydebug "kyrux/core/bootstrap/debug"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -50,6 +51,20 @@ func Init(envPath string) (*Framework, error) {
 
 	render.SetDebug(cfg.App.Debug)
 	kyerrors.SetDebug(cfg.App.Debug)
+	csrf.SetSecure(!cfg.App.Debug)
+
+	if !cfg.App.Debug {
+		if cfg.Security.SecretKey == "change-me" {
+			log.Fatal("bootstrap: SECRET_KEY não definida — defina uma chave forte no .env antes de rodar em produção")
+		}
+		if len(cfg.Security.SecretKey) < 32 {
+			log.Fatal("bootstrap: SECRET_KEY muito curta — use no mínimo 32 caracteres em produção")
+		}
+		if cfg.Database.Enabled && strings.Contains(cfg.Database.DSN, "sslmode=disable") {
+			log.Println("bootstrap: AVISO — DB_DSN contém sslmode=disable; use TLS em produção")
+		}
+	}
+
 	addr := cfg.Server.Host + ":" + cfg.Server.Port
 	render.RegisterAppFuncs(cfg.App.Name, cfg.App.Version, cfg.App.Env, addr)
 	csrf.RegisterFuncs()
@@ -59,6 +74,9 @@ func Init(envPath string) (*Framework, error) {
 	r := router.New()
 	kyerrors.SetRouteListFunc(r.Routes)
 	r.Use(secmiddleware.Recovery())
+	if !cfg.App.Debug {
+		r.Use(secmiddleware.SecureHeaders)
+	}
 	r.Use(secmiddleware.AllowedHosts(cfg.Security.AllowedHost, cfg.App.Debug))
 	r.Use(csrf.Middleware)
 	a := auth.New(cfg.Security.SecretKey)
@@ -115,10 +133,8 @@ func Init(envPath string) (*Framework, error) {
 		r.HandlePrefix("GET /__kyrux_reload__", lr)
 		log.Println("bootstrap: hotreload ativo")
 
-		go func() {
-			log.Println("bootstrap: pprof disponível em http://localhost:6060/debug/pprof/")
-			http.ListenAndServe("localhost:6060", nil)
-		}()
+		r.Internal("GET /kyrux/debug/", kydebug.Handler(cfg.App.Name, cfg.App.Version, cfg.App.Env, addr, cfg.Server.Workers, r.Routes))
+		log.Printf("bootstrap: debug em http://%s/kyrux/debug/\n", addr)
 	}
 
 	return f, nil
@@ -137,11 +153,16 @@ func (f *Framework) Run() error {
 	addr := f.Settings.Server.Host + ":" + f.Settings.Server.Port
 	fmt.Printf("Kyrux running on http://%s (workers: %d)\n", addr, f.Settings.Server.Workers)
 
+	writeTimeout := 10 * time.Second
+	if f.Settings.App.Debug {
+		writeTimeout = 0 // SSE (hotreload) precisa de conexões de longa duração
+	}
+
 	srv := &http.Server{
 		Addr:           addr,
 		Handler:        f.Router,
 		ReadTimeout:    5 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		WriteTimeout:   writeTimeout,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
@@ -156,7 +177,9 @@ func (f *Framework) Run() error {
 		fmt.Printf("signal: %s\n", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		srv.Shutdown(ctx)
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("bootstrap: shutdown: %v\n", err)
+		}
 		fmt.Printf("[%s] see you again.\n", time.Now().Format("15:04:05"))
 		close(done)
 	}()

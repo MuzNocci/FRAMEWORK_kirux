@@ -22,6 +22,11 @@ var unsafeMethods = map[string]bool{
 	"POST": true, "PUT": true, "PATCH": true, "DELETE": true,
 }
 
+var secureCookie bool
+
+// SetSecure ativa a flag Secure no cookie CSRF. Deve ser chamado no bootstrap.
+func SetSecure(v bool) { secureCookie = v }
+
 // RegisterFuncs registra {{ csrf_token }} no FuncMap global de templates.
 // Deve ser chamado no bootstrap antes do primeiro render.
 func RegisterFuncs() {
@@ -65,6 +70,7 @@ func getOrCreate(ctx *router.Context) string {
 		Name:     cookieName,
 		Value:    token,
 		HttpOnly: false,
+		Secure:   secureCookie,
 		SameSite: http.SameSiteStrictMode,
 		Path:     "/",
 	})

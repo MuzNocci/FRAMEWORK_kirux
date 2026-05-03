@@ -70,7 +70,9 @@ func parseHosts(s string) []string {
 
 func Load() *Settings {
 	return &Settings{
-		InstalledApps: []string{},
+		InstalledApps: []string{
+			"teste",
+		},
 		App: AppSettings{
 			Name:    "kyrux",
 			Version: "0.1.0",

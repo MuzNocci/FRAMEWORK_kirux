@@ -41,8 +41,14 @@ func Verify(token, secret string) (string, error) {
 		return "", ErrInvalidSignature
 	}
 
-	expected, err := Sign(string(payload), secret)
-	if err != nil || expected != token {
+	// Computa o MAC esperado diretamente e compara em tempo-constante,
+	// evitando timing attacks na verificação da assinatura.
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expectedSig := mac.Sum(nil)
+
+	submittedSig, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil || !hmac.Equal(expectedSig, submittedSig) {
 		return "", ErrInvalidSignature
 	}
 
