@@ -55,8 +55,8 @@ func LoadSettings() *Settings {
 	return &Settings{
 		InstalledApps: []string{},
 		App: AppSettings{
-			Name:    environment.GetOr("APP_NAME", "kyrux"),
-			Version: environment.GetOr("APP_VERSION", "0.1.0"),
+			Name:    "kyrux",
+			Version: "0.1.0",
 			Env:     environment.GetOr("APP_ENV", "production"),
 			Debug:   environment.GetOr("APP_ENV", "production") == "development",
 		},
