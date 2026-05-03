@@ -81,7 +81,7 @@ projeto/
 │       │   └── models.go      ← structs e queries
 │       ├── templates/
 │       │   ├── base.html      ← template base
-│       │   └── index.html     ← página do app
+│       │   └── exemplo.html   ← página de exemplo gerada pelo CLI
 │       └── statics/
 │           ├── css/
 │           └── js/
@@ -134,12 +134,12 @@ go run main.go startapp <nome>
 ```
 
 Gera automaticamente:
-- `apps/<nome>/routes.go`
-- `apps/<nome>/views/views.go`
+- `apps/<nome>/routes.go` — com rota `GET /` e view `ExemploView`
+- `apps/<nome>/views/views.go` — com `func ExemploView`
 - `apps/<nome>/models/models.go`
-- `apps/<nome>/templates/index.html`
+- `apps/<nome>/templates/exemplo.html` — página de boas-vindas estilizada
 - Pastas `statics/css/` e `statics/js/`
-- Registra em `InstalledApps` e adiciona o import
+- Registra em `InstalledApps` e adiciona o import automaticamente
 
 ### Remover um app
 
@@ -174,6 +174,7 @@ var URLPatterns = []router.URLPattern{
 | `<nome:str>`      | `/posts/meu-post/`    | Qualquer texto sem barra         |
 | `<nome:string>`   | `/posts/meu-post/`    | Idêntico a `str`                 |
 | `<id:int>`        | `/users/42/`          | Número inteiro                   |
+| `<preco:float>`   | `/produto/9.99/`      | Número decimal                   |
 | `<slug:slug>`     | `/artigos/go-lang/`   | Texto sem barra                  |
 | `<uid:uuid>`      | `/item/550e8400.../`  | UUID                             |
 | `<resto:path>`    | `/arquivos/a/b/c`     | Múltiplos segmentos (com barras) |
@@ -844,6 +845,8 @@ Zero JavaScript escrito pelo desenvolvedor.
 |---------------|----------------------|---------------------------|
 | `production`  | Página de erro estilizada | Página de erro 500   |
 | `development` | Página de debug (com rotas registradas) | Página de debug (com stack trace) |
+
+A página de debug é exibida **automaticamente** — não há rota dedicada. Qualquer erro ou panic em `development` a aciona diretamente.
 
 ### Acionar erro em uma view
 
