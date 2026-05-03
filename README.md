@@ -80,14 +80,27 @@ go run main.go removeapp <nome>
 ## VARIÁVEIS DE AMBIENTE (.env):
 
 ```env
-APP_NAME=kyrux
-APP_ENV=development  # production → debug desligado automaticamente
+# Enviroment
+# development → debug automático ligado
+# production → debug automático desligado
+APP_ENV=development
 
+# Server
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8000
-SERVER_WORKERS=4  # omitir para usar todos os CPUs disponíveis
+SERVER_WORKERS=4  # Quando não definido, serão utilizados todos os workers disponíveis no CPU.
 
-RUNTIME_GOGC=500  # omitir para usar o padrão do Go (100)
+# Database
+DB_DRIVER=postgres
+DB_DSN=postgres://user:password@localhost:5432/kyrux?sslmode=disable
+
+# Cache
+CACHE_DRIVER=memory
+CACHE_ADDR=localhost:6379
+
+# Security
+SECRET_KEY=your-strong-random-secret-key-here
+SESSION_TTL=3600
 ```
 
 
