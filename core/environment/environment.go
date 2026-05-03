@@ -23,6 +23,9 @@ func Load(path string) error {
 			continue
 		}
 		key = strings.TrimSpace(key)
+		if idx := strings.Index(value, " #"); idx != -1 {
+			value = value[:idx]
+		}
 		value = strings.TrimSpace(value)
 		loaded[key] = value
 		os.Setenv(key, value)

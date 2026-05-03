@@ -6,6 +6,10 @@
 
 # Build
 /bin/
+/kyrux
+/kyrux_bench
+/tmp/
+/core/air/tmp/
 *.exe
 *.exe~
 *.dll

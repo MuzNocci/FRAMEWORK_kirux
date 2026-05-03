@@ -12,6 +12,13 @@ type Context struct {
 	data    map[string]any
 }
 
+func (c *Context) SetParam(key, value string) {
+	if c.Params == nil {
+		c.Params = make(map[string]string)
+	}
+	c.Params[key] = value
+}
+
 func (c *Context) Set(key string, value any) {
 	if c.data == nil {
 		c.data = make(map[string]any)

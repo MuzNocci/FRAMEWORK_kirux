@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -13,24 +14,33 @@ const installedFile = "core/apps/installed.go"
 const settingsFile = "core/settings.go"
 
 func Run(args []string) {
-	if len(args) < 2 {
+	if len(args) < 1 {
 		printUsage()
 		os.Exit(1)
 	}
 
 	command := args[0]
-	appName := strings.ToLower(args[1])
 
 	switch command {
-	case "startapp":
-		if err := startApp(appName); err != nil {
-			fmt.Fprintf(os.Stderr, "erro: %v\n", err)
+	case "dev":
+		runDev()
+	case "startapp", "removeapp":
+		if len(args) < 2 {
+			printUsage()
 			os.Exit(1)
 		}
-	case "removeapp":
-		if err := removeApp(appName); err != nil {
-			fmt.Fprintf(os.Stderr, "erro: %v\n", err)
-			os.Exit(1)
+		appName := strings.ToLower(args[1])
+		switch command {
+		case "startapp":
+			if err := startApp(appName); err != nil {
+				fmt.Fprintf(os.Stderr, "erro: %v\n", err)
+				os.Exit(1)
+			}
+		case "removeapp":
+			if err := removeApp(appName); err != nil {
+				fmt.Fprintf(os.Stderr, "erro: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "comando desconhecido: %s\n\n", command)
@@ -40,11 +50,29 @@ func Run(args []string) {
 }
 
 func printUsage() {
-	fmt.Println("uso: go run main.go <comando> <app>")
+	fmt.Println("uso: go run main.go <comando> [app]")
 	fmt.Println()
 	fmt.Println("comandos:")
+	fmt.Println("  dev                inicia o servidor em modo desenvolvimento com Air")
 	fmt.Println("  startapp  <nome>   cria um novo app")
 	fmt.Println("  removeapp <nome>   remove um app existente")
+}
+
+func runDev() {
+	if _, err := exec.LookPath("air"); err != nil {
+		fmt.Fprintln(os.Stderr, "Air não encontrado. Instale com:")
+		fmt.Fprintln(os.Stderr, "  go install github.com/air-verse/air@latest")
+		os.Exit(1)
+	}
+	fmt.Println("Iniciando Kyrux em modo desenvolvimento com Air...")
+	cmd := exec.Command("air", "-c", "core/air/.air.toml")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "erro: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // ── startapp ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,10 @@
 package core
 
-import "kyrux/core/environment"
+import (
+	"kyrux/core/environment"
+	"runtime"
+	"strconv"
+)
 
 type Settings struct {
 	InstalledApps []string
@@ -19,8 +23,9 @@ type AppSettings struct {
 }
 
 type ServerSettings struct {
-	Host string
-	Port string
+	Host    string
+	Port    string
+	Workers int
 }
 
 type DatabaseSettings struct {
@@ -39,18 +44,26 @@ type SecuritySettings struct {
 	AllowedHost []string
 }
 
+func intOr(s string, fallback int) int {
+	if n, err := strconv.Atoi(s); err == nil && n > 0 {
+		return n
+	}
+	return fallback
+}
+
 func LoadSettings() *Settings {
 	return &Settings{
 		InstalledApps: []string{},
 		App: AppSettings{
 			Name:    environment.GetOr("APP_NAME", "kyrux"),
 			Version: environment.GetOr("APP_VERSION", "0.1.0"),
-			Debug:   environment.GetOr("APP_DEBUG", "false") == "true",
 			Env:     environment.GetOr("APP_ENV", "production"),
+			Debug:   environment.GetOr("APP_ENV", "production") == "development",
 		},
 		Server: ServerSettings{
-			Host: environment.GetOr("SERVER_HOST", "0.0.0.0"),
-			Port: environment.GetOr("SERVER_PORT", "8000"),
+			Host:    environment.GetOr("SERVER_HOST", "0.0.0.0"),
+			Port:    environment.GetOr("SERVER_PORT", "8000"),
+			Workers: intOr(environment.Get("SERVER_WORKERS"), runtime.NumCPU()),
 		},
 		Database: DatabaseSettings{
 			Driver: environment.GetOr("DB_DRIVER", "postgres"),

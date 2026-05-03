@@ -1,6 +1,8 @@
 # KYRUX FRAMEWORK
 Criado e desenvolvido por Müller Nocciolli.
 Contato: muller.nocciolli@gmail.com
+Site: www.nocciolli.com.br
+Documentação: www.kyrux.com.br/docs/
 
 
 
@@ -22,16 +24,19 @@ Framework web em Go baseado em SSR, EventBus e Realtime invisível.
 Inicializa todo o framework (env, db, cache, router, realtime)
 
 ### Environment:
-Leitura de .env e variáveis do sistema
+Leitura de .env e variáveis do sistema com suporte a comentários inline
 
 ### Settings:
-Configuração tipada global
+Configuração tipada global com controle de workers e GOGC via .env
 
 ### Router:
-Mapeamento de URLs para views
+Mapeamento de URLs para views com rastreamento de rotas registradas
 
 ### Render:
-Renderização SSR com injeção automática de realtime
+Renderização SSR com injeção automática de realtime, sync.Pool de buffers e Content-Length
+
+### Middleware:
+Compressão gzip e cadeia de middlewares por rota
 
 ### Security:
 Autenticação, sessão, criptografia e middleware
@@ -42,12 +47,23 @@ Sistema interno de eventos desacoplados
 ### Realtime:
 WebSocket invisível + bridge com EventBus
 
+### CLI:
+Gerenciamento de apps e servidor de desenvolvimento via comandos
+
 
 ## COMANDOS:
 
 ### Iniciar o servidor:
 ```bash
 go run main.go
+```
+
+### Iniciar em modo desenvolvimento com live reload (requer Air):
+```bash
+# instalar o Air (uma vez)
+go install github.com/air-verse/air@latest
+
+go run main.go dev
 ```
 
 ### Criar um novo app:
@@ -61,11 +77,36 @@ go run main.go removeapp <nome>
 ```
 
 
+## VARIÁVEIS DE AMBIENTE (.env):
+
+```env
+APP_NAME=kyrux
+APP_ENV=development  # production → debug desligado automaticamente
+
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8000
+SERVER_WORKERS=4  # omitir para usar todos os CPUs disponíveis
+
+RUNTIME_GOGC=500  # omitir para usar o padrão do Go (100)
+```
+
+
 ## FLUXO DO SISTEMA:
 Request -> Middleware -> Router -> View -> Service -> DB
 -> EventBus -> Realtime -> Client update automático
 
 
+## FLUXO DE DESENVOLVIMENTO (com Air):
+Arquivo .go alterado -> Air detecta -> Recompila -> Reinicia servidor
+Arquivo .html/.css/.js alterado -> core/hotreload detecta -> SSE -> Browser recarrega
+
+
 ## CONCEITO CHAVE:
 Kyrux representa execução no "momento certo" (Kairos),
 onde eventos dirigem a atualização do sistema em tempo real.
+
+
+## LICENÇA:
+MIT License com cláusula de atribuição obrigatória.
+Qualquer projeto que utilize o Kyrux deve incluir créditos visíveis ao framework.
+Veja o arquivo LICENSE para detalhes.

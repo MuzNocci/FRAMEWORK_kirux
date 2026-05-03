@@ -2,10 +2,15 @@ package welcome
 
 import (
 	_ "embed"
+	"bytes"
+	"crypto/md5"
+	"fmt"
 	"html/template"
 	"kyrux/core/environment"
 	"kyrux/core/router"
+	"net/http"
 	"runtime"
+	"strconv"
 )
 
 //go:embed welcome.html
@@ -25,10 +30,7 @@ func RegisterIfNeeded(r *router.Router) {
 	if r.HasRoute("GET /") {
 		return
 	}
-	r.Handle("GET /", handler)
-}
 
-func handler(ctx *router.Context) {
 	d := pageData{
 		AppName:   environment.GetOr("APP_NAME", "kyrux"),
 		Version:   environment.GetOr("APP_VERSION", "0.1.0"),
@@ -36,6 +38,24 @@ func handler(ctx *router.Context) {
 		Addr:      environment.GetOr("SERVER_HOST", "0.0.0.0") + ":" + environment.GetOr("SERVER_PORT", "8080"),
 		GoVersion: runtime.Version(),
 	}
-	ctx.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = welcomeTpl.Execute(ctx.Writer, d)
+	var buf bytes.Buffer
+	if err := welcomeTpl.Execute(&buf, d); err != nil {
+		panic("welcome: " + err.Error())
+	}
+	body := buf.Bytes()
+	etag := fmt.Sprintf(`"%x"`, md5.Sum(body))
+	contentLen := strconv.Itoa(len(body))
+
+	r.Handle("GET /", func(ctx *router.Context) {
+		if ctx.Request.Header.Get("If-None-Match") == etag {
+			ctx.Writer.WriteHeader(http.StatusNotModified)
+			return
+		}
+		h := ctx.Writer.Header()
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		h.Set("Content-Length", contentLen)
+		h.Set("ETag", etag)
+		h.Set("Cache-Control", "no-cache")
+		ctx.Writer.Write(body)
+	})
 }

@@ -13,9 +13,14 @@ import (
 	"kyrux/core/render"
 	"kyrux/core/router"
 	"kyrux/core/security/auth"
+	"kyrux/core/security/csrf"
 	"kyrux/core/security/session"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
+	"runtime"
+	"runtime/debug"
+	"strconv"
 	"time"
 )
 
@@ -37,11 +42,14 @@ func Init(envPath string) (*Framework, error) {
 
 	settings := core.LoadSettings()
 
+	render.SetDebug(settings.App.Debug)
 	render.AddDefaultProcessor(render.AppContext(settings.App.Version))
+	render.AddDefaultProcessor(csrf.Processor())
 
 	bus := events.NewBus()
 	hub := realtime.NewHub(bus)
 	r := router.New()
+	r.Use(csrf.Middleware)
 	a := auth.New(settings.Security.SecretKey)
 	store := session.NewStore(time.Duration(settings.Security.SessionTTL) * time.Second)
 
@@ -95,13 +103,36 @@ func Init(envPath string) (*Framework, error) {
 		lr.Watch("apps", "statics")
 		r.HandlePrefix("GET /__kyrux_reload__", lr)
 		log.Println("bootstrap: hotreload ativo")
+
+		go func() {
+			log.Println("bootstrap: pprof disponível em http://localhost:6060/debug/pprof/")
+			http.ListenAndServe("localhost:6060", nil)
+		}()
 	}
 
 	return f, nil
 }
 
 func (f *Framework) Run() error {
+	runtime.GOMAXPROCS(f.Settings.Server.Workers)
+
+	if gc := environment.Get("RUNTIME_GOGC"); gc != "" {
+		if n, err := strconv.Atoi(gc); err == nil {
+			debug.SetGCPercent(n)
+			log.Printf("bootstrap: GOGC=%d\n", n)
+		}
+	}
+
 	addr := f.Settings.Server.Host + ":" + f.Settings.Server.Port
-	fmt.Printf("Kyrux running on http://%s\n", addr)
-	return http.ListenAndServe(addr, f.Router)
+	fmt.Printf("Kyrux running on http://%s (workers: %d)\n", addr, f.Settings.Server.Workers)
+
+	srv := &http.Server{
+		Addr:           addr,
+		Handler:        f.Router,
+		ReadTimeout:    5 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	return srv.ListenAndServe()
 }

@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"kyrux/core/environment"
 	"kyrux/core/router"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
+
+var templateFuncs = template.FuncMap{
+	"url": router.Resolve,
+}
 
 const reloadScript = `<script>
 (function(){
@@ -27,11 +32,11 @@ var (
 	defaultProcessors []ContextProcessor
 	renderersMu       sync.RWMutex
 	renderers         = map[string]*Renderer{}
+	debugMode         atomic.Bool
 )
 
-func isDebug() bool {
-	return environment.GetOr("APP_DEBUG", "false") == "true"
-}
+func SetDebug(v bool)  { debugMode.Store(v) }
+func isDebug() bool    { return debugMode.Load() }
 
 func AddDefaultProcessor(p ContextProcessor) {
 	defaultProcessors = append(defaultProcessors, p)
@@ -76,7 +81,10 @@ func (r *Renderer) With(processors ...ContextProcessor) *Renderer {
 }
 
 func (r *Renderer) Render(ctx *router.Context, template string, data map[string]any) {
-	merged := make(map[string]any)
+	merged := mergedPool.Get().(map[string]any)
+	for k := range merged {
+		delete(merged, k)
+	}
 	for _, p := range r.processors {
 		for k, v := range p(ctx) {
 			merged[k] = v
@@ -85,7 +93,9 @@ func (r *Renderer) Render(ctx *router.Context, template string, data map[string]
 	for k, v := range data {
 		merged[k] = v
 	}
-	if err := r.engine.Render(ctx.Writer, template, merged); err != nil {
+	err := r.engine.Render(ctx.Writer, template, merged)
+	mergedPool.Put(merged)
+	if err != nil {
 		http.Error(ctx.Writer, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -108,11 +118,11 @@ func (e *Engine) reload() error {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".html" {
 			return err
 		}
-		tmpl, err := template.ParseFiles(path)
+		name := filepath.Base(path)
+		tmpl, err := template.New(name).Funcs(templateFuncs).ParseFiles(path)
 		if err != nil {
 			return err
 		}
-		name := filepath.Base(path)
 		templates[name] = tmpl
 		return nil
 	})
@@ -124,17 +134,10 @@ func (e *Engine) reload() error {
 	return nil
 }
 
-func (e *Engine) execute(name string, data any) (string, error) {
-	tmpl, ok := e.templates[name]
-	if !ok {
-		return "", fmt.Errorf("template '%s' não encontrado", name)
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
+var (
+	bufPool    = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+	mergedPool = sync.Pool{New: func() any { return make(map[string]any, 8) }}
+)
 
 func (e *Engine) Render(w http.ResponseWriter, name string, data any) error {
 	if isDebug() {
@@ -143,20 +146,43 @@ func (e *Engine) Render(w http.ResponseWriter, name string, data any) error {
 		e.mu.Unlock()
 	}
 
-	e.mu.RLock()
-	body, err := e.execute(name, data)
-	e.mu.RUnlock()
+	// em produção o mapa é imutável após o startup — sem lock
+	var tmpl *template.Template
+	if isDebug() {
+		e.mu.RLock()
+		tmpl = e.templates[name]
+		e.mu.RUnlock()
+	} else {
+		tmpl = e.templates[name]
+	}
 
-	if err != nil {
+	if tmpl == nil {
+		return fmt.Errorf("template '%s' não encontrado", name)
+	}
+
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+
+	if err := tmpl.Execute(buf, data); err != nil {
+		bufPool.Put(buf)
 		return err
 	}
 
 	if isDebug() {
-		body = strings.Replace(body, "</body>", reloadScript+"</body>", 1)
+		s := strings.Replace(buf.String(), "</body>", reloadScript+"</body>", 1)
+		bufPool.Put(buf)
+		h := w.Header()
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		h.Set("Content-Length", strconv.Itoa(len(s)))
+		_, err := w.Write([]byte(s))
+		return err
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, err = w.Write([]byte(body))
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Length", strconv.Itoa(buf.Len()))
+	_, err := w.Write(buf.Bytes())
+	bufPool.Put(buf) // Write é síncrono — seguro devolver o buffer agora
 	return err
 }
 

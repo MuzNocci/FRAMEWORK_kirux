@@ -7,13 +7,12 @@ import (
 )
 
 func AppContext(version string) ContextProcessor {
-	return func(_ *router.Context) map[string]any {
-		return map[string]any{
-			"AppName":   environment.GetOr("APP_NAME", "kyrux"),
-			"Version":   version,
-			"Env":       environment.GetOr("APP_ENV", "production"),
-			"Addr":      environment.GetOr("SERVER_HOST", "0.0.0.0") + ":" + environment.GetOr("SERVER_PORT", "8080"),
-			"GoVersion": runtime.Version(),
-		}
+	cached := map[string]any{
+		"AppName":   environment.GetOr("APP_NAME", "kyrux"),
+		"Version":   version,
+		"Env":       environment.GetOr("APP_ENV", "production"),
+		"Addr":      environment.GetOr("SERVER_HOST", "0.0.0.0") + ":" + environment.GetOr("SERVER_PORT", "8080"),
+		"GoVersion": runtime.Version(),
 	}
+	return func(_ *router.Context) map[string]any { return cached }
 }

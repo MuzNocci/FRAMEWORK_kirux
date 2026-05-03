@@ -51,5 +51,13 @@ func StaticHandler(dir string) http.Handler {
 }
 
 func MultiStaticHandler(appsDir string) http.Handler {
-	return http.FileServer(&multiStatic{dirs: collectStaticDirs(appsDir)})
+	fs := http.FileServer(&multiStatic{dirs: collectStaticDirs(appsDir)})
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isDebug() {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		fs.ServeHTTP(w, r)
+	})
 }

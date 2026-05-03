@@ -1,0 +1,12 @@
+root    = "."
+tmp_dir = "core/air/tmp"
+
+[build]
+  cmd         = "go build -o core/air/tmp/main ."
+  bin         = "core/air/tmp/main"
+  include_ext = ["go"]
+  exclude_dir = ["core/air/tmp", "vendor", "statics", "medias"]
+  delay       = 500
+
+[log]
+  time = true

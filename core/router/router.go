@@ -1,6 +1,11 @@
 package router
 
-import "net/http"
+import (
+	"net/http"
+	"sync"
+)
+
+var ctxPool = sync.Pool{New: func() any { return &Context{} }}
 
 type HandlerFunc func(ctx *Context)
 
@@ -28,7 +33,13 @@ func (r *Router) Handle(pattern string, h HandlerFunc) {
 	r.routes[pattern] = true
 	chain := r.chain(h)
 	r.mux.HandleFunc(pattern, func(w http.ResponseWriter, req *http.Request) {
-		chain(&Context{Writer: w, Request: req, Params: map[string]string{}})
+		ctx := ctxPool.Get().(*Context)
+		ctx.Writer = w
+		ctx.Request = req
+		ctx.Params = nil
+		ctx.data = nil
+		chain(ctx)
+		ctxPool.Put(ctx)
 	})
 }
 
