@@ -43,8 +43,9 @@ func Init(envPath string) (*Framework, error) {
 	settings := core.LoadSettings()
 
 	render.SetDebug(settings.App.Debug)
-	render.AddDefaultProcessor(render.AppContext(settings.App.Version))
-	render.AddDefaultProcessor(csrf.Processor())
+	addr := settings.Server.Host + ":" + settings.Server.Port
+	render.RegisterAppFuncs(settings.App.Name, settings.App.Version, settings.App.Env, addr)
+	csrf.RegisterFuncs()
 
 	bus := events.NewBus()
 	hub := realtime.NewHub(bus)

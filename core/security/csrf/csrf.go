@@ -22,6 +22,20 @@ var unsafeMethods = map[string]bool{
 	"POST": true, "PUT": true, "PATCH": true, "DELETE": true,
 }
 
+// RegisterFuncs registra {{ csrf_token }} no FuncMap global de templates.
+// Deve ser chamado no bootstrap antes do primeiro render.
+func RegisterFuncs() {
+	render.AddFunc("csrf_token", func() template.HTML {
+		ctx := render.GetCurrentCtx()
+		if ctx == nil {
+			return ""
+		}
+		v, _ := ctx.Get(contextKey)
+		token, _ := v.(string)
+		return template.HTML(`<input type="hidden" name="` + fieldName + `" value="` + token + `">`)
+	})
+}
+
 func Middleware(next router.HandlerFunc) router.HandlerFunc {
 	return func(ctx *router.Context) {
 		token := getOrCreate(ctx)
@@ -39,16 +53,6 @@ func Middleware(next router.HandlerFunc) router.HandlerFunc {
 		}
 
 		next(ctx)
-	}
-}
-
-func Processor() render.ContextProcessor {
-	return func(ctx *router.Context) map[string]any {
-		token, _ := ctx.Get(contextKey)
-		t, _ := token.(string)
-		return map[string]any{
-			"csrf_token": template.HTML(`<input type="hidden" name="` + fieldName + `" value="` + t + `">`),
-		}
 	}
 }
 

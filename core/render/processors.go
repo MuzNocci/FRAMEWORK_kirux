@@ -1,18 +1,14 @@
 package render
 
-import (
-	"kyrux/core/environment"
-	"kyrux/core/router"
-	"runtime"
-)
+import "runtime"
 
-func AppContext(version string) ContextProcessor {
-	cached := map[string]any{
-		"AppName":   environment.GetOr("APP_NAME", "kyrux"),
-		"Version":   version,
-		"Env":       environment.GetOr("APP_ENV", "production"),
-		"Addr":      environment.GetOr("SERVER_HOST", "0.0.0.0") + ":" + environment.GetOr("SERVER_PORT", "8080"),
-		"GoVersion": runtime.Version(),
-	}
-	return func(_ *router.Context) map[string]any { return cached }
+// RegisterAppFuncs registra as variáveis estáticas do framework no FuncMap.
+// Disponíveis nos templates sem ponto: {{ AppName }}, {{ Version }}, etc.
+func RegisterAppFuncs(name, version, env, addr string) {
+	goVer := runtime.Version()
+	AddFunc("AppName", func() string { return name })
+	AddFunc("Version", func() string { return version })
+	AddFunc("Env", func() string { return env })
+	AddFunc("Addr", func() string { return addr })
+	AddFunc("GoVersion", func() string { return goVer })
 }

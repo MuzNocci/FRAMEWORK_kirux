@@ -81,6 +81,9 @@ func (r *Renderer) With(processors ...ContextProcessor) *Renderer {
 }
 
 func (r *Renderer) Render(ctx *router.Context, template string, data map[string]any) {
+	setCurrentCtx(ctx)
+	defer clearCurrentCtx()
+
 	merged := mergedPool.Get().(map[string]any)
 	for k := range merged {
 		delete(merged, k)
