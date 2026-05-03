@@ -49,6 +49,9 @@ Sistema interno de eventos desacoplados
 ### Realtime:
 WebSocket invisível com atualização de DOM sem JS manual
 
+### ORM:
+ORM leve e fluente com generics e reflection cacheada. Query builder tipado, SQL explícito com placeholders, suporte a multi-tenant via schema e compatível com todos os drivers SQL
+
 ### CLI:
 Criação e remoção de apps via linha de comando
 
@@ -221,12 +224,38 @@ fw.DB.Add("analytics", "postgres", os.Getenv("ANALYTICS_DSN"))
 fw.DB.Add("legacy",    "mysql",    os.Getenv("LEGACY_DSN"))
 ```
 
-### Uso:
+### Uso (SQL raw):
 ```go
 db := fw.DB.Use()             // conexão "default"
 db := fw.DB.Use("analytics")  // conexão nomeada
 
 rows, err := db.Query("SELECT id, nome FROM usuarios")
+```
+
+### ORM:
+```go
+import "kyrux/core/orm"
+
+// SELECT
+users, err := orm.From[User](db).
+    Where("active = ?", true).
+    OrderBy("id DESC").
+    Limit(20).
+    All()
+
+// INSERT
+user := User{Name: "Maria"}
+orm.Create(db, &user)       // user.ID preenchido após inserção
+
+// UPDATE
+orm.From[User](db).Where("id = ?", 1).Update(map[string]any{"name": "Carlos"})
+
+// DELETE
+orm.From[User](db).Where("id = ?", 1).Delete()
+
+// Multi-tenant
+db := fw.DB.Use().WithSchema("tenant_abc")
+orm.From[User](db).All()    // → SELECT * FROM tenant_abc.users
 ```
 
 ### Drivers suportados:
@@ -270,8 +299,9 @@ Arquivo .go alterado    → Air detecta → Recompila → Reinicia servidor
 Arquivo .html/.css/.js  → hotreload detecta → SSE → Browser recarrega
 
 
-## PROFILING (apenas em development):
-Disponível automaticamente em `http://localhost:6060/debug/pprof/`
+## DEBUG DASHBOARD (apenas em development):
+Disponível automaticamente em `http://localhost:8000/kyrux/debug/`
+Exibe informações da aplicação, runtime Go (goroutines, heap, GC) e todas as rotas registradas.
 
 
 ## PERFORMANCE:

@@ -17,14 +17,15 @@ Criado por Müller Nocciolli · [www.kyrux.com.br/docs](https://www.kyrux.com.br
 8. [CSRF](#8-csrf)
 9. [Middleware](#9-middleware)
 10. [Banco de Dados](#10-banco-de-dados)
-11. [Cache](#11-cache)
-12. [Sessões](#12-sessões)
-13. [Autenticação JWT](#13-autenticação-jwt)
-14. [EventBus](#14-eventbus)
-15. [Realtime (DOM sem JS)](#15-realtime-dom-sem-js)
-16. [Páginas de Erro](#16-páginas-de-erro)
-17. [Profiling](#17-profiling)
-18. [Fluxo do Sistema](#18-fluxo-do-sistema)
+11. [ORM](#11-orm)
+12. [Cache](#12-cache)
+13. [Sessões](#13-sessões)
+14. [Autenticação JWT](#14-autenticação-jwt)
+15. [EventBus](#15-eventbus)
+16. [Realtime (DOM sem JS)](#16-realtime-dom-sem-js)
+17. [Páginas de Erro](#17-páginas-de-erro)
+18. [Debug Dashboard](#18-debug-dashboard)
+19. [Fluxo do Sistema](#19-fluxo-do-sistema)
 
 ---
 
@@ -567,6 +568,16 @@ err := fw.DB.Use().Transaction(func(tx *sql.Tx) error {
 })
 ```
 
+### Multi-tenant com schema
+
+```go
+// Retorna uma cópia da conexão com o schema definido — a original não é alterada.
+db := fw.DB.Use().WithSchema("tenant_abc")
+```
+
+Todas as queries executadas com essa conexão usarão `tenant_abc.<tabela>` automaticamente.
+Veja a seção [ORM](#11-orm) para uso completo com multi-tenant.
+
 ### Drivers suportados
 
 | Driver      | Módulo Go                          | Observação          |
@@ -583,7 +594,218 @@ err := fw.DB.Use().Transaction(func(tx *sql.Tx) error {
 
 ---
 
-## 11. Cache
+## 11. ORM
+
+ORM leve e fluente integrado ao framework. Usa generics, reflection cacheada e SQL explícito com placeholders — sem magia, sem surpresas.
+
+```go
+import "kyrux/core/orm"
+```
+
+### Definição de model
+
+Um model é qualquer struct Go com campos exportados. Use a tag `kyrux` para configurar comportamento:
+
+```go
+type Post struct {
+    ID        int64     `kyrux:"pk"`
+    Titulo    string
+    Slug      string
+    Publicado bool
+    CriadoEm time.Time `kyrux:"column:criado_em"`
+}
+```
+
+#### Tags disponíveis
+
+| Tag | Descrição |
+|---|---|
+| `kyrux:"pk"` | Marca como chave primária. Ignorado no INSERT, preenchido de volta após criação. |
+| `kyrux:"column:nome"` | Override do nome da coluna SQL. Por padrão é `snake_case` do nome do campo. |
+
+#### Nome da tabela
+
+Gerado automaticamente a partir do nome do struct em `snake_case` plural:
+
+| Struct | Tabela |
+|---|---|
+| `User` | `users` |
+| `Post` | `posts` |
+| `Category` | `categories` |
+| `UserProfile` | `user_profiles` |
+| `Address` | `addresses` |
+
+### Leitura
+
+#### All — buscar todos
+
+```go
+db := fw.DB.Use()
+
+posts, err := orm.From[Post](db).All()
+
+// Com filtros
+posts, err := orm.From[Post](db).
+    Where("publicado = ?", true).
+    OrderBy("criado_em DESC").
+    Limit(10).
+    Offset(20).  // página 3
+    All()
+```
+
+#### First — buscar o primeiro
+
+Retorna `sql.ErrNoRows` se nenhuma linha for encontrada.
+
+```go
+post, err := orm.From[Post](db).
+    Where("slug = ?", slug).
+    First()
+
+if errors.Is(err, sql.ErrNoRows) {
+    ctx.Error(404)
+    return
+}
+```
+
+#### Count — contar linhas
+
+```go
+total, err := orm.From[Post](db).Count()
+
+publicados, err := orm.From[Post](db).
+    Where("publicado = ?", true).
+    Count()
+```
+
+#### Métodos de filtro encadeáveis
+
+| Método | Descrição |
+|---|---|
+| `Where(cond string, args ...any)` | Adiciona condição `AND`. Múltiplos `Where` são combinados com `AND`. |
+| `OrderBy(col string)` | Define `ORDER BY`. Ex: `"criado_em DESC"`. |
+| `Limit(n int)` | Máximo de linhas retornadas. |
+| `Offset(n int)` | Linhas a pular — use com `Limit` para paginação. |
+
+### Criação
+
+Passe sempre um **ponteiro** para que o campo PK seja preenchido de volta.
+
+```go
+post := Post{
+    Titulo:    "Olá Kyrux",
+    Slug:      "ola-kyrux",
+    Publicado: true,
+}
+
+err := orm.Create(db, &post)
+fmt.Println(post.ID) // preenchido com o ID gerado pelo banco
+```
+
+PostgreSQL usa `RETURNING` internamente — sem round-trip extra.
+MySQL e SQLite usam `LastInsertId`.
+
+### Atualização
+
+Exige ao menos um `Where` para evitar updates acidentais em toda a tabela.
+
+```go
+err := orm.From[Post](db).
+    Where("id = ?", 1).
+    Update(map[string]any{
+        "titulo":    "Título atualizado",
+        "publicado": true,
+    })
+```
+
+### Deleção
+
+Exige ao menos um `Where` para evitar deleções acidentais em toda a tabela.
+
+```go
+err := orm.From[Post](db).
+    Where("id = ?", 1).
+    Delete()
+```
+
+### Multi-tenant com schema
+
+```go
+// Middleware de tenant define o schema
+db := fw.DB.Use().WithSchema("tenant_" + tenantID)
+
+// Todas as queries usam o schema automaticamente
+posts, _ := orm.From[Post](db).Where("publicado = ?", true).All()
+// → SELECT * FROM tenant_abc.posts WHERE publicado = ?
+
+post := Post{Titulo: "Novo"}
+orm.Create(db, &post)
+// → INSERT INTO tenant_abc.posts (titulo, ...) VALUES (?)
+```
+
+### Compatibilidade de drivers
+
+O ORM detecta o driver automaticamente. Você escreve sempre `?` — para PostgreSQL os placeholders são reescritos para `$1, $2, ...` internamente.
+
+| Driver | Placeholder gerado |
+|---|---|
+| `postgres`, `pgx` | `$1, $2, ...` |
+| `mysql`, `sqlite` | `?` |
+
+### Uso em models
+
+Padrão recomendado — funções no pacote `models` que recebem `*database.DB`:
+
+```go
+// apps/blog/models/models.go
+package models
+
+import (
+    "kyrux/core/database"
+    "kyrux/core/orm"
+)
+
+type Post struct {
+    ID        int64  `kyrux:"pk"`
+    Titulo    string
+    Publicado bool
+}
+
+func ListarPublicados(db *database.DB) ([]Post, error) {
+    return orm.From[Post](db).
+        Where("publicado = ?", true).
+        OrderBy("id DESC").
+        All()
+}
+
+func BuscarPorID(db *database.DB, id int64) (*Post, error) {
+    return orm.From[Post](db).
+        Where("id = ?", id).
+        First()
+}
+
+func Criar(db *database.DB, post *Post) error {
+    return orm.Create(db, post)
+}
+```
+
+```go
+// apps/blog/views/views.go
+func ListaView(ctx *router.Context) {
+    posts, err := models.ListarPublicados(fw.DB.Use())
+    if err != nil {
+        ctx.Error(500)
+        return
+    }
+    render.For("blog").Render(ctx, "lista.html", map[string]any{
+        "posts": posts,
+    })
+}
+```
+
+---
+
+## 12. Cache
 
 Cache em memória com TTL. Ativado via `CACHE_ENABLED=true`.
 
@@ -613,7 +835,7 @@ func ListaView(ctx *router.Context) {
         return
     }
 
-    posts := models.ListarPosts(fw.DB.Use())
+    posts, _ := models.ListarPublicados(fw.DB.Use())
     fw.Cache.Set(cacheKey, posts, 2*time.Minute)
 
     render.For("blog").Render(ctx, "lista.html", map[string]any{
@@ -624,7 +846,7 @@ func ListaView(ctx *router.Context) {
 
 ---
 
-## 12. Sessões
+## 13. Sessões
 
 Sessões em memória server-side com TTL configurável via `SESSION_TTL`.
 
@@ -685,7 +907,7 @@ func LogoutView(ctx *router.Context) {
 
 ---
 
-## 13. Autenticação JWT
+## 14. Autenticação JWT
 
 Para APIs e autenticação stateless.
 
@@ -740,7 +962,7 @@ r.Use(secmiddleware.RequireAuth(fw.Auth))
 
 ---
 
-## 14. EventBus
+## 15. EventBus
 
 Sistema de eventos desacoplados. Útil para comunicação entre apps sem importação direta.
 
@@ -778,7 +1000,7 @@ fw.Events.Unsubscribe("usuario.criado")
 
 ---
 
-## 15. Realtime (DOM sem JS)
+## 16. Realtime (DOM sem JS)
 
 O Kyrux injeta automaticamente um WebSocket em toda página renderizada. O desenvolvedor não escreve nenhum JS — apenas atributos HTML e funções Go.
 
@@ -798,7 +1020,7 @@ func CriarPostView(ctx *router.Context) {
 
     // Renderiza o fragmento atualizado
     html, _ := render.Partial("blog", "partials/lista.html", map[string]any{
-        "posts": models.ListarPosts(fw.DB.Use()),
+        "posts": models.ListarPublicados(fw.DB.Use()),
     })
 
     fw.Realtime.Replace("lista-posts", html)   // substitui o innerHTML
@@ -831,7 +1053,7 @@ Zero JavaScript escrito pelo desenvolvedor.
 
 ---
 
-## 16. Páginas de Erro
+## 17. Páginas de Erro
 
 ### Comportamento por ambiente
 
@@ -878,7 +1100,7 @@ errors.Set(500, func(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-## 17. Debug Dashboard
+## 18. Debug Dashboard
 
 Disponível automaticamente em `APP_ENV=development`:
 
@@ -896,7 +1118,7 @@ Exibe:
 
 ---
 
-## 18. Fluxo do Sistema
+## 19. Fluxo do Sistema
 
 ### Fluxo de uma requisição
 
@@ -908,7 +1130,7 @@ Request
   → Router (encontra a view)
   → Middleware da view (se houver)
   → View (lógica do desenvolvedor)
-    → Service / Model (queries)
+    → Service / Model (queries via ORM ou SQL raw)
     → DB / Cache
     → EventBus.Publish()
     → Realtime.Replace() / Append() / Prepend()
@@ -977,6 +1199,30 @@ ctx.Writer                     // http.ResponseWriter
 ctx.Params                     // map[string]string
 ```
 
+### ORM — todos os métodos
+
+```go
+// Leitura
+orm.From[T](db).All()                          // ([]T, error)
+orm.From[T](db).First()                        // (*T, error) — sql.ErrNoRows se vazio
+orm.From[T](db).Count()                        // (int64, error)
+
+// Filtros encadeáveis (retornam *Query[T])
+.Where("col = ?", val)
+.OrderBy("col DESC")
+.Limit(n)
+.Offset(n)
+
+// Escrita
+orm.Create(db, &model)                         // error — preenche PK
+orm.From[T](db).Where(...).Update(map[string]any{...}) // error
+orm.From[T](db).Where(...).Delete()            // error
+
+// Multi-tenant
+db := fw.DB.Use().WithSchema("tenant_abc")
+orm.From[T](db).All()  // → SELECT * FROM tenant_abc.tabela
+```
+
 ### Realtime — todos os métodos
 
 ```go
@@ -998,11 +1244,12 @@ fw.Events.Unsubscribe("evento")          // cancelar
 ### DB Manager — todos os métodos
 
 ```go
-fw.DB.Add("nome", "driver", "dsn")   // adicionar conexão
-fw.DB.Use()                          // conexão "default"
-fw.DB.Use("nome")                    // conexão nomeada
+fw.DB.Add("nome", "driver", "dsn")          // adicionar conexão
+fw.DB.Use()                                 // conexão "default"
+fw.DB.Use("nome")                           // conexão nomeada
+fw.DB.Use().WithSchema("schema")            // cópia com schema (multi-tenant)
 fw.DB.Use().Transaction(func(tx) error { ... })
-fw.DB.Close()                        // encerrar todas
+fw.DB.Close()                               // encerrar todas
 ```
 
 ---

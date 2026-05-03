@@ -7,10 +7,18 @@ import (
 	"time"
 )
 
-// DB encapsula *sql.DB com o nome do driver.
+// DB encapsula *sql.DB com o nome do driver e um schema opcional.
 type DB struct {
 	*sql.DB
 	Driver string
+	Schema string
+}
+
+// WithSchema retorna uma cópia de DB com o schema definido — útil para multi-tenant.
+//
+//	db := fw.DB.Use().WithSchema("tenant_abc")
+func (db *DB) WithSchema(schema string) *DB {
+	return &DB{DB: db.DB, Driver: db.Driver, Schema: schema}
 }
 
 func (db *DB) Transaction(fn func(tx *sql.Tx) error) error {

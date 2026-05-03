@@ -72,6 +72,7 @@ func Load() *Settings {
 	return &Settings{
 		InstalledApps: []string{
 			"teste",
+			"testando",
 		},
 		App: AppSettings{
 			Name:    "kyrux",

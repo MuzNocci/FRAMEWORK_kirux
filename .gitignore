@@ -10,6 +10,8 @@
 /kyrux_bench
 /tmp/
 /core/air/tmp/
+/apps/*
+!/apps/.gitkeep
 *.exe
 *.exe~
 *.dll
