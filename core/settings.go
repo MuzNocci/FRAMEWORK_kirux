@@ -4,6 +4,7 @@ import (
 	"kyrux/core/environment"
 	"runtime"
 	"strconv"
+	"strings"
 )
 
 type Settings struct {
@@ -29,13 +30,15 @@ type ServerSettings struct {
 }
 
 type DatabaseSettings struct {
-	Driver string
-	DSN    string
+	Enabled bool
+	Driver  string
+	DSN     string
 }
 
 type CacheSettings struct {
-	Driver string
-	Addr   string
+	Enabled bool
+	Driver  string
+	Addr    string
 }
 
 type SecuritySettings struct {
@@ -49,6 +52,20 @@ func intOr(s string, fallback int) int {
 		return n
 	}
 	return fallback
+}
+
+func parseHosts(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	hosts := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if h := strings.TrimSpace(p); h != "" {
+			hosts = append(hosts, h)
+		}
+	}
+	return hosts
 }
 
 func LoadSettings() *Settings {
@@ -66,16 +83,19 @@ func LoadSettings() *Settings {
 			Workers: intOr(environment.Get("SERVER_WORKERS"), runtime.NumCPU()),
 		},
 		Database: DatabaseSettings{
-			Driver: environment.GetOr("DB_DRIVER", "postgres"),
-			DSN:    environment.Get("DB_DSN"),
+			Enabled: environment.GetOr("DB_ENABLED", "false") == "true",
+			Driver:  environment.GetOr("DB_DRIVER", "postgres"),
+			DSN:     environment.Get("DB_DSN"),
 		},
 		Cache: CacheSettings{
-			Driver: environment.Get("CACHE_DRIVER"),
-			Addr:   environment.Get("CACHE_ADDR"),
+			Enabled: environment.GetOr("CACHE_ENABLED", "false") == "true",
+			Driver:  environment.Get("CACHE_DRIVER"),
+			Addr:    environment.Get("CACHE_ADDR"),
 		},
 		Security: SecuritySettings{
-			SecretKey:  environment.GetOr("SECRET_KEY", "change-me"),
-			SessionTTL: 3600,
+			SecretKey:   environment.GetOr("SECRET_KEY", "change-me"),
+			SessionTTL:  3600,
+			AllowedHost: parseHosts(environment.Get("ALLOWED_HOSTS")),
 		},
 	}
 }

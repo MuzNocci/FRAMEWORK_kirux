@@ -1,10 +1,37 @@
 package realtime
 
 import (
+	"encoding/json"
 	"kyrux/core/events"
 	"net/http"
 	"sync"
 )
+
+type domUpdate struct {
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	HTML   string `json:"html"`
+	Action string `json:"action"`
+}
+
+func (h *Hub) sendDOM(target, html, action string) {
+	data, _ := json.Marshal(domUpdate{
+		Type: "kyrux:dom", Target: target, HTML: html, Action: action,
+	})
+	h.mu.RLock()
+	for _, c := range h.clients {
+		select {
+		case c.send <- data:
+		default:
+		}
+	}
+	h.mu.RUnlock()
+}
+
+func (h *Hub) Replace(target, html string) { h.sendDOM(target, html, "replace") }
+func (h *Hub) Append(target, html string)  { h.sendDOM(target, html, "append") }
+func (h *Hub) Prepend(target, html string) { h.sendDOM(target, html, "prepend") }
+func (h *Hub) Remove(target string)        { h.sendDOM(target, "", "remove") }
 
 type Hub struct {
 	mu      sync.RWMutex

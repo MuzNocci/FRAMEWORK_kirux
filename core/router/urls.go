@@ -33,7 +33,7 @@ func Include(r *Router, patterns []URLPattern) {
 	for _, p := range patterns {
 		r.Handle(p.Method+" "+p.Path, p.View)
 		if p.Name != "" {
-			urlRegistry[p.Name] = p.Path
+			urlRegistry[p.Name] = displayPath(convertPattern(p.Path))
 		}
 	}
 	registryMu.Unlock()

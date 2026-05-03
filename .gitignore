@@ -37,5 +37,6 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
-# Uploads
-medias/
+# Media uploads (user-generated content — use external storage in production)
+/medias/*
+!/medias/.gitkeep

@@ -1,11 +1,13 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"kyrux/core"
 	"kyrux/core/bootstrap/welcome"
 	"kyrux/core/cache"
 	"kyrux/core/database"
+	kyerrors "kyrux/core/errors"
 	"kyrux/core/environment"
 	"kyrux/core/events"
 	"kyrux/core/hotreload"
@@ -14,13 +16,17 @@ import (
 	"kyrux/core/router"
 	"kyrux/core/security/auth"
 	"kyrux/core/security/csrf"
+	secmiddleware "kyrux/core/security/middleware"
 	"kyrux/core/security/session"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"os/signal"
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -29,7 +35,7 @@ type Framework struct {
 	Router   *router.Router
 	Events   *events.Bus
 	Realtime *realtime.Hub
-	DB       *database.DB
+	DB       *database.Manager
 	Cache    *cache.Cache
 	Auth     *auth.Authenticator
 	Sessions *session.Store
@@ -43,6 +49,7 @@ func Init(envPath string) (*Framework, error) {
 	settings := core.LoadSettings()
 
 	render.SetDebug(settings.App.Debug)
+	kyerrors.SetDebug(settings.App.Debug)
 	addr := settings.Server.Host + ":" + settings.Server.Port
 	render.RegisterAppFuncs(settings.App.Name, settings.App.Version, settings.App.Env, addr)
 	csrf.RegisterFuncs()
@@ -50,35 +57,38 @@ func Init(envPath string) (*Framework, error) {
 	bus := events.NewBus()
 	hub := realtime.NewHub(bus)
 	r := router.New()
+	kyerrors.SetRouteListFunc(r.Routes)
+	r.Use(secmiddleware.Recovery())
+	r.Use(secmiddleware.AllowedHosts(settings.Security.AllowedHost, settings.App.Debug))
 	r.Use(csrf.Middleware)
 	a := auth.New(settings.Security.SecretKey)
 	store := session.NewStore(time.Duration(settings.Security.SessionTTL) * time.Second)
+
+	dbm := database.NewManager()
+	if settings.Database.Enabled {
+		if err := dbm.Add("default", settings.Database.Driver, settings.Database.DSN); err != nil {
+			return nil, fmt.Errorf("bootstrap: db: %w", err)
+		}
+		log.Println("bootstrap: database connected")
+	} else {
+		log.Println("bootstrap: database disabled (DB_ENABLED=false)")
+	}
 
 	f := &Framework{
 		Settings: settings,
 		Router:   r,
 		Events:   bus,
 		Realtime: hub,
+		DB:       dbm,
 		Auth:     a,
 		Sessions: store,
 	}
 
-	if settings.Database.DSN != "" {
-		db, err := database.Connect(settings.Database.Driver, settings.Database.DSN)
-		if err != nil {
-			return nil, fmt.Errorf("bootstrap: db: %w", err)
-		}
-		f.DB = db
-		log.Println("bootstrap: database connected")
-	} else {
-		log.Println("bootstrap: database disabled (DB_DSN not set)")
-	}
-
-	if settings.Cache.Driver != "" {
+	if settings.Cache.Enabled {
 		f.Cache = cache.New()
 		log.Println("bootstrap: cache enabled")
 	} else {
-		log.Println("bootstrap: cache disabled (CACHE_DRIVER not set)")
+		log.Println("bootstrap: cache disabled (CACHE_ENABLED=false)")
 	}
 
 	for _, appName := range settings.InstalledApps {
@@ -92,7 +102,7 @@ func Init(envPath string) (*Framework, error) {
 
 	welcome.RegisterIfNeeded(r)
 
-	r.Handle("GET /ws", func(ctx *router.Context) {
+	r.Internal("GET /kyrux/websocket/ws/", func(ctx *router.Context) {
 		hub.ServeHTTP(ctx.Writer, ctx.Request)
 	})
 
@@ -135,5 +145,25 @@ func (f *Framework) Run() error {
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	return srv.ListenAndServe()
+
+	quit := make(chan os.Signal, 1)
+	done := make(chan struct{})
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-quit
+		fmt.Printf("\n[%s] cleaning...\n", time.Now().Format("15:04:05"))
+		fmt.Printf("signal: %s\n", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		srv.Shutdown(ctx)
+		fmt.Printf("[%s] see you again.\n", time.Now().Format("15:04:05"))
+		close(done)
+	}()
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	<-done
+	return nil
 }

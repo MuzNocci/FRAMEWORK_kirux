@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -22,8 +21,6 @@ func Run(args []string) {
 	command := args[0]
 
 	switch command {
-	case "dev":
-		runDev()
 	case "startapp", "removeapp":
 		if len(args) < 2 {
 			printUsage()
@@ -53,26 +50,8 @@ func printUsage() {
 	fmt.Println("uso: go run main.go <comando> [app]")
 	fmt.Println()
 	fmt.Println("comandos:")
-	fmt.Println("  dev                inicia o servidor em modo desenvolvimento com Air")
 	fmt.Println("  startapp  <nome>   cria um novo app")
 	fmt.Println("  removeapp <nome>   remove um app existente")
-}
-
-func runDev() {
-	if _, err := exec.LookPath("air"); err != nil {
-		fmt.Fprintln(os.Stderr, "Air não encontrado. Instale com:")
-		fmt.Fprintln(os.Stderr, "  go install github.com/air-verse/air@latest")
-		os.Exit(1)
-	}
-	fmt.Println("Iniciando Kyrux em modo desenvolvimento com Air...")
-	cmd := exec.Command("air", "-c", "core/air/.air.toml")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "erro: %v\n", err)
-		os.Exit(1)
-	}
 }
 
 // ── startapp ─────────────────────────────────────────────────────────────────
@@ -105,7 +84,7 @@ func startApp(name string) error {
 		{filepath.Join(base, "routes.go"), routesTpl},
 		{filepath.Join(base, "views", "views.go"), viewsTpl},
 		{filepath.Join(base, "models", "models.go"), modelsTpl},
-		{filepath.Join(base, "templates", "index.html"), templateTpl},
+		{filepath.Join(base, "templates", "exemplo.html"), templateTpl},
 	}
 
 	data := struct{ Name string }{Name: name}
@@ -378,7 +357,7 @@ func init() {
 }
 
 var URLPatterns = []router.URLPattern{
-	router.Path("GET", "", views.{{title .Name}}View, "url_name"),
+	router.Path("GET", "/", views.ExemploView, "exemplo_home"),
 }
 
 func Register(r *router.Router) {
@@ -393,11 +372,11 @@ import (
 	"kyrux/core/router"
 )
 
-func {{title .Name}}View(ctx *router.Context) {
+func ExemploView(ctx *router.Context) {
 	context := map[string]any{
 		"example": "example",
 	}
-	render.For("{{.Name}}").Render(ctx, "index.html", context)
+	render.For("{{.Name}}").Render(ctx, "exemplo.html", context)
 }
 `
 
@@ -407,12 +386,52 @@ var modelsTpl = `package models
 var templateTpl = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{"{{"}} AppName {{"}}"}}</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{"{{"}} AppName {{"}}"}}</title>
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}:root{--go-blue:#00ACD7;--go-blue-light:#5DC9E2;--go-blue-dark:#00758D;--bg:#0D1117;--surface:#161B22;--border:#1E2A38;--text:#E6EDF3;--muted:#8B949E}html,body{height:100%}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:auto}header{border-bottom:1px solid var(--border);padding:.9rem 2.5rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0}.logo-mark{width:28px;height:28px;background:var(--go-blue);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:#fff;letter-spacing:-.5px}header span{font-size:1rem;font-weight:600;color:var(--text)}header .version{margin-left:auto;font-size:.7rem;color:var(--muted);background:var(--border);padding:.2rem .55rem;border-radius:999px}main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 2rem;text-align:center;gap:1.1rem}.badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--go-blue-light);background:rgba(0,172,215,.1);border:1px solid rgba(0,172,215,.2);padding:.3rem .8rem;border-radius:999px;margin-bottom:.25rem}.dot{width:6px;height:6px;border-radius:50%;background:var(--go-blue-light);animation:pulse 2s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}h1{font-size:clamp(1.4rem,3.5vw,2.2rem);font-weight:800;letter-spacing:-.03em;color:var(--text)}.subtitle{font-size:clamp(.82rem,1.4vw,.95rem);color:var(--muted);max-width:420px;line-height:1.7}.cards{display:flex;gap:1rem;margin-top:.5rem;flex-wrap:wrap;justify-content:center}.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.4rem;text-align:left;width:180px;transition:border-color .2s}.card:hover{border-color:var(--go-blue-dark)}.card-icon{font-size:1.3rem;margin-bottom:.5rem}.card-title{font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:.2rem}.card-desc{font-size:.75rem;color:var(--muted);line-height:1.5}.actions{display:flex;gap:.75rem;margin-top:.5rem;flex-wrap:wrap;justify-content:center}.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.5rem 1.2rem;border-radius:8px;font-size:.82rem;text-decoration:none;font-weight:600;transition:border-color .2s,color .2s,background .2s}.btn-primary{background:var(--go-blue);color:#fff;border:1px solid var(--go-blue)}.btn-primary:hover{background:var(--go-blue-dark);border-color:var(--go-blue-dark)}.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}.btn-ghost:hover{border-color:var(--go-blue-dark);color:var(--text)}footer{border-top:1px solid var(--border);padding:.75rem 2rem;text-align:center;font-size:.82rem;color:var(--muted);flex-shrink:0}footer a{color:var(--go-blue);text-decoration:none}footer a:hover{text-decoration:underline}@media(max-width:640px){main{padding:2rem 1.25rem;gap:1rem}.cards{flex-direction:column;align-items:center}.card{width:100%;max-width:280px}}@media(max-width:380px){.actions{flex-direction:column;align-items:center}}</style>
 </head>
 <body>
-  <h1>{{.Name}}</h1>
+<header>
+  <div class="logo-mark">K</div>
+  <span>{{"{{"}} AppName {{"}}"}}</span>
+  <span class="version">v{{"{{"}} Version {{"}}"}}</span>
+</header>
+<main>
+  <span class="badge"><span class="dot"></span> servidor rodando</span>
+  <h1>Bem-vindo ao {{"{{"}} AppName {{"}}"}}</h1>
+  <p class="subtitle">Seu projeto está funcionando. Edite as views, rotas e templates para começar a construir.</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon">&#128218;</div>
+      <div class="card-title">Rotas</div>
+      <div class="card-desc">Defina URLs em <code>routes.go</code> com <code>router.Path()</code>.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">&#128065;</div>
+      <div class="card-title">Views</div>
+      <div class="card-desc">Lógica das páginas em <code>views/views.go</code> via <code>ctx</code>.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">&#127912;</div>
+      <div class="card-title">Templates</div>
+      <div class="card-desc">HTML em <code>templates/</code> com o motor nativo do Go.</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a href="/kyrux/debug/" class="btn btn-primary">&#9881; Debug</a>
+    <a href="https://www.kyrux.com.br/docs/" target="_blank" class="btn btn-ghost">Documentação &#8599;</a>
+  </div>
+</main>
+<footer>
+  Kyrux Framework &mdash; construído com <a href="https://go.dev" target="_blank">Go</a>
+  &nbsp;&middot;&nbsp;
+  <a href="https://www.kyrux.com.br/docs/" target="_blank">Documentação</a>
+  &nbsp;&middot;&nbsp;
+  desenvolvido por <a href="https://www.nocciolli.com.br" target="_blank">M&uuml;ller Nocciolli</a>
+</footer>
 </body>
 </html>
 `

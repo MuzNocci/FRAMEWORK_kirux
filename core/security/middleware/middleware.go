@@ -1,11 +1,42 @@
 package middleware
 
 import (
+	kyerrors "kyrux/core/errors"
 	"kyrux/core/router"
 	"kyrux/core/security/auth"
 	"net/http"
+	"runtime/debug"
 	"strings"
 )
+
+func AllowedHosts(hosts []string, debug bool) router.MiddlewareFunc {
+	allowed := make(map[string]struct{}, len(hosts))
+	wildcard := false
+	for _, h := range hosts {
+		if h == "*" {
+			wildcard = true
+			break
+		}
+		allowed[h] = struct{}{}
+	}
+	return func(next router.HandlerFunc) router.HandlerFunc {
+		return func(ctx *router.Context) {
+			if debug || wildcard {
+				next(ctx)
+				return
+			}
+			host := ctx.Request.Host
+			if i := strings.LastIndex(host, ":"); i != -1 {
+				host = host[:i]
+			}
+			if _, ok := allowed[host]; !ok {
+				http.Error(ctx.Writer, "400 Bad Request — host não permitido", http.StatusBadRequest)
+				return
+			}
+			next(ctx)
+		}
+	}
+}
 
 func RequireAuth(a *auth.Authenticator) router.MiddlewareFunc {
 	return func(next router.HandlerFunc) router.HandlerFunc {
@@ -51,8 +82,8 @@ func Recovery() router.MiddlewareFunc {
 	return func(next router.HandlerFunc) router.HandlerFunc {
 		return func(ctx *router.Context) {
 			defer func() {
-				if r := recover(); r != nil {
-					ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+				if rec := recover(); rec != nil {
+					kyerrors.RenderPanic(ctx.Writer, ctx.Request, rec, debug.Stack())
 				}
 			}()
 			next(ctx)
