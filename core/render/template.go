@@ -121,7 +121,7 @@ func (e *Engine) compile(name string) (*compiledEntry, error) {
 	}
 
 	// cria o set com execName como root (será o template executado)
-	root := template.New(execName).Funcs(templateFuncs)
+	root := template.New(execName).Funcs(templateFuncs).Option("missingkey=error")
 	if c, ok := collected[execName]; ok {
 		if _, err := root.Parse(c); err != nil {
 			return nil, err
@@ -135,6 +135,17 @@ func (e *Engine) compile(name string) (*compiledEntry, error) {
 	}
 
 	return &compiledEntry{set: root, execName: execName}, nil
+}
+
+// sourceOf retorna o conteúdo pré-processado de um template pelo nome.
+func (e *Engine) sourceOf(name string) (string, bool) {
+	e.mu.RLock()
+	info, ok := e.sources[name]
+	e.mu.RUnlock()
+	if !ok {
+		return "", false
+	}
+	return info.content, true
 }
 
 // collectTransitive adiciona name e todos os {{template}} que ele referencia.

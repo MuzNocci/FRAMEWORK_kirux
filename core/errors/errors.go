@@ -21,7 +21,10 @@ var debugHTML string
 
 var (
 	tpl      = template.Must(template.New("error").Parse(errorHTML))
-	debugTpl = template.Must(template.New("debug").Parse(debugHTML))
+	debugTpl = template.Must(template.New("debug").Funcs(template.FuncMap{
+		"lbrace": func() string { return "{{" },
+		"rbrace": func() string { return "}}" },
+	}).Parse(debugHTML))
 )
 
 var debugMode atomic.Bool
@@ -48,15 +51,34 @@ type pageData struct {
 }
 
 type debugData struct {
-	AppName string
-	Version string
-	Code    int
-	Title   string
-	Method  string
-	Path    string
-	Error   string
-	Stack   template.HTML
-	Routes  []RouteEntry
+	AppName  string
+	Version  string
+	Code     int
+	Title    string
+	Method   string
+	Path     string
+	Error    string
+	Stack    template.HTML
+	Routes   []RouteEntry
+	TplError *TemplateError
+}
+
+// TemplateError descreve um erro de template com localização precisa.
+// Preenchido pelo pacote render e renderizado pela debug page.
+type TemplateError struct {
+	Kind    string      // "missing_dot" | "missing_key" | "syntax"
+	File    string      // nome do arquivo de template
+	Line    int         // linha onde o erro ocorreu (1-based)
+	VarName string      // nome da variável envolvida
+	Raw     string      // mensagem original do Go template engine
+	Snippet []SnippetLine
+}
+
+// SnippetLine representa uma linha do template exibida no contexto do erro.
+type SnippetLine struct {
+	Number  int
+	Content string
+	IsError bool
 }
 
 var catalog = map[int][2]string{
@@ -161,8 +183,13 @@ func renderDebugPanic(w http.ResponseWriter, r *http.Request, recovered any, sta
 		Version: environment.GetOr("APP_VERSION", "0.1.0"),
 		Method:  r.Method,
 		Path:    r.URL.Path,
-		Error:   fmt.Sprintf("%v", recovered),
 		Stack:   formatStack(stack),
+	}
+	if te, ok := recovered.(*TemplateError); ok {
+		d.TplError = te
+		d.Error = te.Raw
+	} else {
+		d.Error = fmt.Sprintf("%v", recovered)
 	}
 	writeDebug(w, http.StatusInternalServerError, d)
 }

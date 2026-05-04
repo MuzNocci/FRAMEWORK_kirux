@@ -1,4 +1,4 @@
 package apps
 import (
-	_ "kyrux/apps/testando"
+	_ "kyrux/apps/teste"
 )

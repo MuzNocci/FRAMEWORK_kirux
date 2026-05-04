@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+//go:embed debug.html
 var dashHTML string
 
 var (

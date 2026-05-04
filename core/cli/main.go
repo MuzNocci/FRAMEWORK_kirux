@@ -369,9 +369,9 @@ var templateTpl = `<!DOCTYPE html>
   <span class="version">v{{"{{"}} Version {{"}}"}}</span>
 </header>
 <main>
-  <span class="badge"><span class="dot"></span> servidor rodando</span>
-  <h1>Bem-vindo ao {{"{{"}} AppName {{"}}"}}</h1>
-  <p class="subtitle">Seu projeto está funcionando. Edite as views, rotas e templates para começar a construir.</p>
+  <span class="badge"><span class="dot"></span> Servidor operacional</span>
+  <h1>Seu APP foi criado corretamente!</h1>
+  <p class="subtitle">Esta é a página de exemplo de app no <strong>{{"{{"}} AppName {{"}}"}}</strong>. Substitua este template em <code>templates/exemplo.html</code> e comece a desenvolver.</p>
 
   <div class="cards">
     <div class="card">

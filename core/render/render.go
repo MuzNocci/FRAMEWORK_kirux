@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,6 +57,71 @@ var (
 	renderers         = map[string]*Renderer{}
 	debugMode         atomic.Bool
 )
+
+var (
+	// {{ variavel }} sem ponto — erro de parse: Go interpreta como chamada de função inexistente.
+	reMissingFunc = regexp.MustCompile(`template: ([^:]+):(\d+): function "([^"]+)" not defined`)
+	// {{ .variavel }} onde a chave não existe no map — erro de execução com missingkey=error.
+	reMissingKey = regexp.MustCompile(`map has no entry for key "([^"]+)"`)
+	// Posição genérica: extrai arquivo:linha de qualquer erro de template.
+	reTemplatePos = regexp.MustCompile(`template: ([^:]+):(\d+)`)
+)
+
+func parseTemplateError(err error, eng *Engine) *kyerrors.TemplateError {
+	msg := err.Error()
+	te := &kyerrors.TemplateError{Raw: msg}
+
+	switch {
+	case reMissingFunc.MatchString(msg):
+		m := reMissingFunc.FindStringSubmatch(msg)
+		te.Kind = "missing_dot"
+		te.File = m[1]
+		te.Line, _ = strconv.Atoi(m[2])
+		te.VarName = m[3]
+	case reMissingKey.MatchString(msg):
+		te.Kind = "missing_key"
+		m := reMissingKey.FindStringSubmatch(msg)
+		te.VarName = m[1]
+		if p := reTemplatePos.FindStringSubmatch(msg); p != nil {
+			te.File = p[1]
+			te.Line, _ = strconv.Atoi(p[2])
+		}
+	default:
+		te.Kind = "syntax"
+		if p := reTemplatePos.FindStringSubmatch(msg); p != nil {
+			te.File = p[1]
+			te.Line, _ = strconv.Atoi(p[2])
+		}
+	}
+
+	if te.File != "" && te.Line > 0 {
+		if src, ok := eng.sourceOf(te.File); ok {
+			te.Snippet = buildSnippet(src, te.Line, 3)
+		}
+	}
+	return te
+}
+
+func buildSnippet(src string, errorLine, context int) []kyerrors.SnippetLine {
+	lines := strings.Split(src, "\n")
+	start := errorLine - context - 1
+	if start < 0 {
+		start = 0
+	}
+	end := errorLine + context
+	if end > len(lines) {
+		end = len(lines)
+	}
+	out := make([]kyerrors.SnippetLine, 0, end-start)
+	for i := start; i < end; i++ {
+		out = append(out, kyerrors.SnippetLine{
+			Number:  i + 1,
+			Content: lines[i],
+			IsError: i+1 == errorLine,
+		})
+	}
+	return out
+}
 
 func SetDebug(v bool)  { debugMode.Store(v) }
 func isDebug() bool    { return debugMode.Load() }
@@ -122,7 +188,11 @@ func (r *Renderer) Render(ctx *router.Context, template string, data map[string]
 	mergedPool.Put(merged)
 	if err != nil {
 		log.Printf("render: %v", err)
-		kyerrors.RenderPanic(ctx.Writer, ctx.Request, err, nil)
+		if isDebug() {
+			kyerrors.RenderPanic(ctx.Writer, ctx.Request, parseTemplateError(err, r.engine), nil)
+		} else {
+			kyerrors.RenderPanic(ctx.Writer, ctx.Request, err, nil)
+		}
 	}
 }
 
@@ -205,7 +275,7 @@ func (e *Engine) RenderToString(name string, data any) (string, error) {
 }
 
 func (e *Engine) RenderFS(w http.ResponseWriter, fsys fs.FS, name string, data any) error {
-	tmpl, err := template.ParseFS(fsys, "*.html")
+	tmpl, err := template.New("").Option("missingkey=error").ParseFS(fsys, "*.html")
 	if err != nil {
 		return err
 	}
@@ -221,7 +291,7 @@ func (e *Engine) RenderEmbed(w http.ResponseWriter, fsys fs.FS, name string, dat
 		}
 		return nil
 	})
-	tmpl, err := template.ParseFS(fsys, files...)
+	tmpl, err := template.New("").Option("missingkey=error").ParseFS(fsys, files...)
 	if err != nil {
 		return err
 	}
